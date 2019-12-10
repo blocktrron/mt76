@@ -85,6 +85,12 @@ static int mt76_led_init(struct mt76_dev *dev)
 	struct ieee80211_hw *hw = dev->hw;
 	int led_pin;
 
+	dev->led_cdev.default_trigger =
+		ieee80211_create_tpt_led_trigger(hw,
+					IEEE80211_TPT_LEDTRIG_FL_RADIO,
+					mt76_tpt_blink,
+					ARRAY_SIZE(mt76_tpt_blink));
+
 	if (!dev->led_cdev.brightness_set && !dev->led_cdev.blink_set)
 		return 0;
 
@@ -92,11 +98,6 @@ static int mt76_led_init(struct mt76_dev *dev)
 		 "mt76-%s", wiphy_name(hw->wiphy));
 
 	dev->led_cdev.name = dev->led_name;
-	dev->led_cdev.default_trigger =
-		ieee80211_create_tpt_led_trigger(hw,
-					IEEE80211_TPT_LEDTRIG_FL_RADIO,
-					mt76_tpt_blink,
-					ARRAY_SIZE(mt76_tpt_blink));
 
 	np = of_get_child_by_name(np, "led");
 	if (np) {
