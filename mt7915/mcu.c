@@ -529,6 +529,9 @@ mt7915_mcu_rx_ext_event(struct mt7915_dev *dev, struct sk_buff *skb)
 	case MCU_EXT_EVENT_FW_LOG_2_HOST:
 		mt7915_mcu_rx_log_message(dev, skb);
 		break;
+	case MCU_EXT_EVENT_TMR_CALCU_INFO:
+		pr_warn("TMR Event\n");
+		break;
 	default:
 		break;
 	}
@@ -556,6 +559,7 @@ void mt7915_mcu_rx_event(struct mt7915_dev *dev, struct sk_buff *skb)
 	if (rxd->ext_eid == MCU_EXT_EVENT_THERMAL_PROTECT ||
 	    rxd->ext_eid == MCU_EXT_EVENT_FW_LOG_2_HOST ||
 	    rxd->ext_eid == MCU_EXT_EVENT_ASSERT_DUMP ||
+	    rxd->ext_eid == MCU_EXT_EVENT_TMR_CALCU_INFO ||
 	    rxd->ext_eid == MCU_EXT_EVENT_PS_SYNC ||
 	    !rxd->seq)
 		mt7915_mcu_rx_unsolicited_event(dev, skb);
@@ -3463,6 +3467,39 @@ int mt7915_mcu_apply_tx_dpd(struct mt7915_phy *phy)
 	}
 
 	return 0;
+}
+
+int mt7915_mcu_set_ftm_responder(struct mt7915_phy *phy, bool enable)
+{
+	struct mt7915_dev *dev = phy->dev;
+	bool is_dbdc = phy != &dev->phy;
+
+	struct {
+		u8 ctrlType;
+		u8 ver; /* ? */
+		u8 throughold;
+		u8 iter;
+		u8 enable;
+		u8 role;
+		u8 catEnable;
+		u8 dbdc_idx;
+		u8 aucTypeSubtype[4];
+	} __packed req = {
+		.ctrlType = 0x00,
+		.ver = 0,
+		.throughold = 8,
+		.iter = 10,
+		.enable = 1,
+		.role = 1,
+		.catEnable = 0,
+		.dbdc_idx = 0,
+		.aucTypeSubtype = {0 | (13 << 2), 3, 3, 3}
+	};
+
+	pr_warn("Enable TMR offload\n");
+
+	return mt76_mcu_send_msg(&dev->mt76, MCU_EXT_CMD(TMR_CTRL), &req,
+				 sizeof(req), true);
 }
 
 int mt7915_mcu_get_chan_mib_info(struct mt7915_phy *phy, bool chan_switch)

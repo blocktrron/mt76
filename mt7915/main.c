@@ -564,6 +564,9 @@ static void mt7915_bss_info_changed(struct ieee80211_hw *hw,
 		mt7915_mcu_add_obss_spr(dev, vif, info->he_obss_pd.enable);
 	}
 
+	if (changed & BSS_CHANGED_FTM_RESPONDER)
+		mt7915_mcu_set_ftm_responder(phy, true);
+
 	if (changed & BSS_CHANGED_ERP_SLOT) {
 		int slottime = info->use_short_slot ? 9 : 20;
 
