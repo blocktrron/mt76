@@ -91,6 +91,7 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
 {
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct mt76_tx_cb *cb = mt76_tx_skb_cb(skb);
+	struct mt76_wcid *wcid;
 	u8 done = MT_TX_CB_DMA_DONE | MT_TX_CB_TXS_DONE;
 
 	flags |= cb->flags;
@@ -98,12 +99,29 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
 
 	if ((flags & done) != done)
 		return;
+	
+	wcid = rcu_dereference(dev->wcid[cb->wcid]);
 
 	/* Tx status can be unreliable. if it fails, mark the frame as ACKed */
 	if (flags & MT_TX_CB_TXS_FAILED) {
+		/* Increment station counter */
+		if (wcid && wcid->sta)
+			wcid->txs_failed_cnt++;
+
 		info->status.rates[0].count = 0;
 		info->status.rates[0].idx = -1;
-		info->flags |= IEEE80211_TX_STAT_ACK;
+
+		/**
+		 * Check if station counter exceeds the limit for
+		 * implicit acks. If not, mark the frame as ACKed.
+		 */
+		if (!wcid || wcid->txs_failed_cnt < 25) {
+			info->flags |= IEEE80211_TX_STAT_ACK;
+		}
+	} else if (info->flags & IEEE80211_TX_STAT_ACK) {
+		/* Reset station counter */
+		if (wcid && wcid->sta)
+			wcid->txs_failed_cnt = 0;
 	}
 
 	__skb_queue_tail(list, skb);

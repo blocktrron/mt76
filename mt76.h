@@ -330,6 +330,8 @@ struct mt76_wcid {
 	u8 rx_key_pn[IEEE80211_NUM_TIDS + 1][6];
 	u16 cipher;
 
+	u8 txs_failed_cnt;
+
 	u32 tx_info;
 	bool sw_iv;
 
