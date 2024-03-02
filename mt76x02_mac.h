@@ -39,6 +39,7 @@ struct mt76x02_sta {
 	struct mt76x02_vif *vif;
 	struct mt76x02_tx_status status;
 	int n_frames;
+	u8 n_enc_mgmt;
 
 	struct ewma_pktlen pktlen;
 };
