@@ -544,6 +544,7 @@ void mt76x02_send_tx_status(struct mt76x02_dev *dev,
 	struct ieee80211_tx_status status = {
 		.info = &info
 	};
+	struct ieee80211_hdr *hdr;
 	static const u8 ac_to_tid[4] = {
 		[IEEE80211_AC_BE] = 0,
 		[IEEE80211_AC_BK] = 1,
@@ -617,6 +618,29 @@ void mt76x02_send_tx_status(struct mt76x02_dev *dev,
 		cur_pktid = stat->pktid;
 		mt76x02_mac_fill_tx_status(dev, msta, status.info, stat, 1);
 		*update = 1;
+	}
+
+	if (msta && status.skb && (status.info->flags & IEEE80211_TX_STAT_ACK)) {
+		hdr = (struct ieee80211_hdr *)status.skb->data;
+
+		if (ieee80211_has_protected(hdr->frame_control) &&
+		    ieee80211_is_robust_mgmt_frame(status.skb)) {
+			/**
+			 * On OWE Networks, chip reports ACTION frames always as acked.
+			 * In case a roaming-assistant sens link-measurements periodically,
+			 * this leads to the station never becoming inactive and not
+			 * being removed from the AP's station list.
+			 */
+			
+			if (msta->n_enc_mgmt >= 10)
+				status.info->flags &= ~IEEE80211_TX_STAT_ACK;
+
+			msta->n_enc_mgmt++;
+		} else {
+			if (msta->n_enc_mgmt > 0)
+				dev_warn(dev->mt76.dev, "ACK for DATA frame after MGMT wcid=%d\n", wcid->idx);
+			msta->n_enc_mgmt = 0;
+		} 
 	}
 
 	if (status.skb) {
