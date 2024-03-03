@@ -1561,6 +1561,17 @@ static bool mt7603_tx_hang(struct mt7603_dev *dev)
 	return i < 4;
 }
 
+static bool mt7603_txs_hang(struct mt7603_dev *dev)
+{
+	struct mt76_dev *mdev = &dev->mt76;
+
+	if (mdev->txs_failed_cnt > 10) {
+		dev_warn(mdev->dev, "Global TXS hang count=%d\n", mdev->txs_failed_cnt);
+	}
+
+	return mdev->txs_failed_cnt > 10;
+}
+
 static bool mt7603_rx_pse_busy(struct mt7603_dev *dev)
 {
 	u32 addr, val;
@@ -1861,6 +1872,9 @@ void mt7603_mac_work(struct work_struct *work)
 	    mt7603_watchdog_check(dev, &dev->tx_hang_check,
 				  RESET_CAUSE_TX_HANG,
 				  mt7603_tx_hang) ||
+		mt7603_watchdog_check(dev, &dev->txs_hang_check,
+				  RESET_CAUSE_TXS_HANG,
+				  mt7603_txs_hang) ||
 	    mt7603_watchdog_check(dev, &dev->tx_dma_check,
 				  RESET_CAUSE_TX_BUSY,
 				  mt7603_tx_dma_busy) ||
@@ -1874,6 +1888,7 @@ void mt7603_mac_work(struct work_struct *work)
 		dev->beacon_check = 0;
 		dev->tx_dma_check = 0;
 		dev->tx_hang_check = 0;
+		dev->txs_hang_check = 0;
 		dev->rx_dma_check = 0;
 		dev->rx_pse_check = 0;
 		dev->mcu_hang = 0;

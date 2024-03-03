@@ -90,6 +90,7 @@ struct mt7603_vif {
 
 enum mt7603_reset_cause {
 	RESET_CAUSE_TX_HANG,
+	RESET_CAUSE_TXS_HANG,
 	RESET_CAUSE_TX_BUSY,
 	RESET_CAUSE_RX_BUSY,
 	RESET_CAUSE_BEACON_STUCK,
@@ -142,6 +143,7 @@ struct mt7603_dev {
 
 	u8 beacon_check;
 	u8 tx_hang_check;
+	u8 txs_hang_check;
 	u8 tx_dma_check;
 	u8 rx_dma_check;
 	u8 rx_pse_check;
