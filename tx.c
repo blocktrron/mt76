@@ -104,6 +104,9 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
 
 	/* Tx status can be unreliable. if it fails, mark the frame as ACKed */
 	if (flags & MT_TX_CB_TXS_FAILED) {
+		/* Increment global counter */
+		dev->txs_failed_cnt++;
+
 		/* Increment station counter */
 		if (wcid && wcid->sta)
 			wcid->txs_failed_cnt++;
@@ -119,6 +122,9 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
 			info->flags |= IEEE80211_TX_STAT_ACK;
 		}
 	} else if (info->flags & IEEE80211_TX_STAT_ACK) {
+		/* Reset global counter */
+		dev->txs_failed_cnt = 0;
+
 		/* Reset station counter */
 		if (wcid && wcid->sta)
 			wcid->txs_failed_cnt = 0;
@@ -236,6 +242,9 @@ mt76_tx_status_check(struct mt76_dev *dev, bool flush)
 	list_for_each_entry_safe(wcid, tmp, &dev->wcid_list, list)
 		mt76_tx_status_skb_get(dev, wcid, flush ? -1 : 0, &list);
 	mt76_tx_status_unlock(dev, &list);
+
+	if (flush)
+		dev->txs_failed_cnt = 0;
 }
 EXPORT_SYMBOL_GPL(mt76_tx_status_check);
 

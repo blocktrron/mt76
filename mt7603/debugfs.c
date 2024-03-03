@@ -8,6 +8,7 @@ mt7603_reset_read(struct seq_file *s, void *data)
 	struct mt7603_dev *dev = dev_get_drvdata(s->private);
 	static const char * const reset_cause_str[] = {
 		[RESET_CAUSE_TX_HANG] = "TX hang",
+		[RESET_CAUSE_TXS_HANG] = "TXS hang",
 		[RESET_CAUSE_TX_BUSY] = "TX DMA busy stuck",
 		[RESET_CAUSE_RX_BUSY] = "RX DMA busy stuck",
 		[RESET_CAUSE_RX_PSE_BUSY] = "RX PSE busy stuck",

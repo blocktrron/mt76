@@ -831,6 +831,8 @@ struct mt76_dev {
 
 	u32 rev;
 
+	u8 txs_failed_cnt;
+
 	struct tasklet_struct pre_tbtt_tasklet;
 	int beacon_int;
 	u8 beacon_mask;
