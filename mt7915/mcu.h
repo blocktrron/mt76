@@ -527,4 +527,39 @@ mt7915_get_power_bound(struct mt7915_phy *phy, s8 txpower)
 	return txpower;
 }
 
+static inline int
+mt7915_has_tx_pending(struct mt7915_dev *dev)
+{
+	struct mt76_dev *mdev = &dev->mt76;
+	struct mt76_phy *mphy;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(mdev->phys); i++) {
+		mphy = mdev->phys[i];
+		if (!mphy)
+			continue;
+
+		if (mt76_has_tx_pending(mphy)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static inline void
+mt7915_mcu_cmd_pre(struct mt7915_dev *dev)
+{
+	mt76_set_tx_blocked(&dev->mt76, true);
+
+	wait_event_timeout(dev->mt76.tx_wait, !mt7915_has_tx_pending(dev), HZ * 10);
+}
+
+static inline void
+mt7915_mcu_cmd_post(struct mt7915_dev *dev)
+{
+	mt76_set_tx_blocked(&dev->mt76, false);
+}
+
+
 #endif

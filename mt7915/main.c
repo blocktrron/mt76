@@ -419,9 +419,11 @@ static int mt7915_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 	}
 
 	mt76_wcid_key_setup(&dev->mt76, wcid, key);
+	mt7915_mcu_cmd_pre(dev);
 	err = mt76_connac_mcu_add_key(&dev->mt76, vif, &msta->bip,
 				      key, MCU_EXT_CMD(STA_REC_UPDATE),
 				      &msta->wcid, cmd);
+	mt7915_mcu_cmd_post(dev);
 out:
 	mutex_unlock(&dev->mt76.mutex);
 
