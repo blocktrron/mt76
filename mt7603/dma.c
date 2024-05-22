@@ -34,7 +34,7 @@ mt7603_rx_loopback_skb(struct mt7603_dev *dev, struct sk_buff *skb)
 	int idx;
 	u32 val;
 
-	if (skb->len < MT_TXD_SIZE + sizeof(struct ieee80211_hdr))
+	if (1 || skb->len < MT_TXD_SIZE + sizeof(struct ieee80211_hdr))
 		goto free;
 
 	val = le32_to_cpu(txd[1]);
