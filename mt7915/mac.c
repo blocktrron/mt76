@@ -1327,20 +1327,6 @@ mt7915_mac_restart(struct mt7915_dev *dev)
 	ext_phy = dev->mt76.phys[MT_BAND1];
 	phy2 = ext_phy ? ext_phy->priv : NULL;
 
-	if (dev->hif2) {
-		mt76_wr(dev, MT_INT1_MASK_CSR, 0x0);
-		mt76_wr(dev, MT_INT1_SOURCE_CSR, ~0);
-	}
-
-	if (dev_is_pci(mdev->dev)) {
-		mt76_wr(dev, MT_PCIE_MAC_INT_ENABLE, 0x0);
-		if (dev->hif2) {
-			if (is_mt7915(mdev))
-				mt76_wr(dev, MT_PCIE1_MAC_INT_ENABLE, 0x0);
-			else
-				mt76_wr(dev, MT_PCIE1_MAC_INT_ENABLE_MT7916, 0x0);
-		}
-	}
 
 	set_bit(MT76_RESET, &dev->mphy.state);
 	set_bit(MT76_MCU_RESET, &dev->mphy.state);
@@ -1352,14 +1338,19 @@ mt7915_mac_restart(struct mt7915_dev *dev)
 	mt76_txq_schedule_all(&dev->mphy);
 	if (ext_phy)
 		mt76_txq_schedule_all(ext_phy);
-
-	/* disable all tx/rx napi */
+	
+	/* disable all tx napi */
 	mt76_worker_disable(&dev->mt76.tx_worker);
+	napi_disable(&dev->mt76.tx_napi);
+
+	/* workaround: Add code from MCU exit */
+	mt7915_mcu_exit(dev);
+
+	/* disable all rx napi */
 	mt76_for_each_q_rx(mdev, i) {
 		if (mdev->q_rx[i].ndesc)
 			napi_disable(&dev->mt76.napi[i]);
 	}
-	napi_disable(&dev->mt76.tx_napi);
 
 	/* token reinit */
 	mt76_connac2_tx_token_put(&dev->mt76);

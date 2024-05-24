@@ -2041,7 +2041,7 @@ static int mt7915_driver_own(struct mt7915_dev *dev, u8 band)
 	return 0;
 }
 
-static int
+int
 mt7915_firmware_state(struct mt7915_dev *dev, bool wa)
 {
 	u32 state = FIELD_PREP(MT_TOP_MISC_FW_STATE,
@@ -2061,6 +2061,7 @@ static int mt7915_load_firmware(struct mt7915_dev *dev)
 
 	/* make sure fw is download state */
 	if (mt7915_firmware_state(dev, false)) {
+		dev_err(dev->mt76.dev, "Firmware is not ready for download\n");
 		/* restart firmware once */
 		mt76_connac_mcu_restart(&dev->mt76);
 		ret = mt7915_firmware_state(dev, false);

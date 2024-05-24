@@ -527,4 +527,6 @@ mt7915_get_power_bound(struct mt7915_phy *phy, s8 txpower)
 	return txpower;
 }
 
+int mt7915_firmware_state(struct mt7915_dev *dev, bool wa);
+
 #endif
