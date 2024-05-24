@@ -1395,6 +1395,18 @@ mt7915_mac_restart(struct mt7915_dev *dev)
 		}
 	}
 
+	/* Add code from MCU exit */
+	mt76_connac_mcu_restart(&dev->mt76);
+	if (mt7915_firmware_state(dev, false)) {
+		dev_err(dev->mt76.dev, "Failed to exit mcu\n");
+		//goto out;
+	}
+
+	mt76_wr(dev, MT_TOP_LPCR_HOST_BAND(0), MT_TOP_LPCR_HOST_FW_OWN);
+	if (dev->hif2)
+		mt76_wr(dev, MT_TOP_LPCR_HOST_BAND(1),
+			MT_TOP_LPCR_HOST_FW_OWN);
+
 	/* load firmware */
 	ret = mt7915_mcu_init_firmware(dev);
 	if (ret)
