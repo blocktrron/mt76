@@ -981,6 +981,9 @@ void mt76_dma_cleanup(struct mt76_dev *dev)
 {
 	int i;
 
+	dev_warn(dev->dev, "DMA cleanup\n");
+	dev->print_reg = 1;
+
 	mt76_worker_disable(&dev->tx_worker);
 	netif_napi_del(&dev->tx_napi);
 
@@ -1019,5 +1022,8 @@ void mt76_dma_cleanup(struct mt76_dev *dev)
 
 	mt76_free_pending_txwi(dev);
 	mt76_free_pending_rxwi(dev);
+
+	dev->print_reg = 0;
+	dev_warn(dev->dev, "DMA cleanup done\n");
 }
 EXPORT_SYMBOL_GPL(mt76_dma_cleanup);

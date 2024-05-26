@@ -174,11 +174,15 @@ static void mt7915_dma_disable(struct mt7915_dev *dev, bool rst)
 	struct mt76_dev *mdev = &dev->mt76;
 	u32 hif1_ofs = 0;
 
+	dev_warn(mdev->dev, "DMA disable\n");
+	mdev->print_reg = 1;
+
 	if (dev->hif2)
 		hif1_ofs = MT_WFDMA0_PCIE1(0) - MT_WFDMA0(0);
 
 	/* reset */
 	if (rst) {
+		dev_warn(mdev->dev, "DMA disable: reset start\n");
 		mt76_clear(dev, MT_WFDMA0_RST,
 			   MT_WFDMA0_RST_DMASHDL_ALL_RST |
 			   MT_WFDMA0_RST_LOGIC_RST);
@@ -216,6 +220,8 @@ static void mt7915_dma_disable(struct mt7915_dev *dev, bool rst)
 					 MT_WFDMA1_RST_LOGIC_RST);
 			}
 		}
+
+		dev_warn(mdev->dev, "DMA disable: reset done\n");
 	}
 
 	/* disable */
@@ -250,6 +256,9 @@ static void mt7915_dma_disable(struct mt7915_dev *dev, bool rst)
 				   MT_WFDMA1_GLO_CFG_OMIT_RX_INFO |
 				   MT_WFDMA1_GLO_CFG_OMIT_RX_INFO_PFET2);
 	}
+
+	mdev->print_reg = 0;
+	dev_warn(mdev->dev, "DMA disable done\n");
 }
 
 int mt7915_dma_start(struct mt7915_dev *dev, bool reset, bool wed_reset)
@@ -258,11 +267,14 @@ int mt7915_dma_start(struct mt7915_dev *dev, bool reset, bool wed_reset)
 	u32 hif1_ofs = 0;
 	u32 irq_mask;
 
+	dev_warn(mdev->dev, "DMA start\n");
+
 	if (dev->hif2)
 		hif1_ofs = MT_WFDMA0_PCIE1(0) - MT_WFDMA0(0);
 
 	/* enable wpdma tx/rx */
 	if (!reset) {
+		dev_warn(mdev->dev, "DMA start: no RESET\n");
 		mt76_set(dev, MT_WFDMA0_GLO_CFG,
 			MT_WFDMA0_GLO_CFG_TX_DMA_EN |
 			MT_WFDMA0_GLO_CFG_RX_DMA_EN |
@@ -328,6 +340,8 @@ int mt7915_dma_start(struct mt7915_dev *dev, bool reset, bool wed_reset)
 	mt7915_irq_enable(dev, irq_mask);
 	mt7915_irq_disable(dev, 0);
 
+	dev_warn(mdev->dev, "DMA start done\n");
+
 	return 0;
 }
 
@@ -335,6 +349,9 @@ static int mt7915_dma_enable(struct mt7915_dev *dev, bool reset)
 {
 	struct mt76_dev *mdev = &dev->mt76;
 	u32 hif1_ofs = 0;
+	int ret;
+
+	dev_warn(mdev->dev, "DMA enable\n");
 
 	if (dev->hif2)
 		hif1_ofs = MT_WFDMA0_PCIE1(0) - MT_WFDMA0(0);
@@ -402,7 +419,9 @@ static int mt7915_dma_enable(struct mt7915_dev *dev, bool reset)
 	mt76_poll(dev, MT_WFDMA_EXT_CSR_HIF_MISC,
 		  MT_WFDMA_EXT_CSR_HIF_MISC_BUSY, 0, 1000);
 
-	return mt7915_dma_start(dev, reset, true);
+	ret = mt7915_dma_start(dev, reset, true);
+	dev_warn(mdev->dev, "DMA enable done\n");
+	return ret;
 }
 
 int mt7915_dma_init(struct mt7915_dev *dev, struct mt7915_phy *phy2)
@@ -593,6 +612,8 @@ int mt7915_dma_reset(struct mt7915_dev *dev, bool force)
 	struct mtk_wed_device *wed = &dev->mt76.mmio.wed;
 	int i;
 
+	dev_warn(dev->mt76.dev, "DMA reset %s\n", force ? "force" : "");
+
 	/* clean up hw queues */
 	for (i = 0; i < ARRAY_SIZE(dev->mt76.phy.q_tx); i++) {
 		mt76_queue_tx_cleanup(dev, dev->mphy.q_tx[i], true);
@@ -643,6 +664,8 @@ int mt7915_dma_reset(struct mt7915_dev *dev, bool force)
 			 MT_WFDMA0_EXT0_RXWB_KEEP);
 
 	mt7915_dma_enable(dev, !force);
+
+	dev_warn(dev->mt76.dev, "DMA reset done\n");
 
 	return 0;
 }

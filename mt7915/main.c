@@ -27,9 +27,12 @@ int mt7915_run(struct ieee80211_hw *hw)
 	bool running;
 	int ret;
 
+	dev_warn(dev->mt76.dev, "Device run\n");
+
 	running = mt7915_dev_running(dev);
 
 	if (!running) {
+		dev_warn(dev->mt76.dev, "Configure phy0\n");
 		ret = mt76_connac_mcu_set_pm(&dev->mt76,
 					     dev->phy.mt76->band_idx, 0);
 		if (ret)
@@ -44,6 +47,7 @@ int mt7915_run(struct ieee80211_hw *hw)
 	}
 
 	if (phy != &dev->phy) {
+		dev_warn(dev->mt76.dev, "Configure phy1\n");
 		ret = mt76_connac_mcu_set_pm(&dev->mt76,
 					     phy->mt76->band_idx, 0);
 		if (ret)
@@ -91,6 +95,7 @@ int mt7915_run(struct ieee80211_hw *hw)
 		mt7915_mac_reset_counters(phy);
 
 out:
+	dev_warn(dev->mt76.dev, "Device running\n");
 	return ret;
 }
 
@@ -112,6 +117,8 @@ static void mt7915_stop(struct ieee80211_hw *hw)
 {
 	struct mt7915_dev *dev = mt7915_hw_dev(hw);
 	struct mt7915_phy *phy = mt7915_hw_phy(hw);
+
+	dev_warn(dev->mt76.dev, "Device stop\n");
 
 	cancel_delayed_work_sync(&phy->mt76->mac_work);
 

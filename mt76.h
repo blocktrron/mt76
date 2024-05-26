@@ -858,6 +858,8 @@ struct mt76_dev {
 	u16 token_count;
 	u16 token_size;
 
+	u8 print_reg;
+
 	spinlock_t rx_token_lock;
 	struct idr rx_token;
 	u16 rx_token_size;
