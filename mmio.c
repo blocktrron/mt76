@@ -19,6 +19,7 @@ static u32 mt76_mmio_rr(struct mt76_dev *dev, u32 offset)
 
 static void mt76_mmio_wr(struct mt76_dev *dev, u32 offset, u32 val)
 {
+	dev_warn(dev->dev, "mmio_wr: offset=0x%x, val=0x%x\n", offset, val);
 	trace_reg_wr(dev, offset, val);
 	writel(val, dev->mmio.regs + offset);
 }
