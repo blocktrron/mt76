@@ -1361,6 +1361,9 @@ mt7915_mac_restart(struct mt7915_dev *dev)
 	}
 	napi_disable(&dev->mt76.tx_napi);
 
+	/* Shutdown MCU */
+	mt7915_mcu_exit(dev);
+
 	/* token reinit */
 	mt76_connac2_tx_token_put(&dev->mt76);
 	idr_init(&dev->mt76.token);

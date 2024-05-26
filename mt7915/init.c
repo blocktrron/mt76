@@ -814,6 +814,29 @@ mt7915_init_hardware(struct mt7915_dev *dev, struct mt7915_phy *phy2)
 	ret = mt7915_dma_init(dev, phy2);
 	if (ret)
 		return ret;
+	
+	mt76_worker_disable(&dev->mt76.tx_worker);
+	mt76_for_each_q_rx(mdev, i) {
+		if (mdev->q_rx[i].ndesc)
+			napi_disable(&dev->mt76.napi[i]);
+	}
+	napi_disable(&dev->mt76.tx_napi);
+
+	//mt7915_dma_reset(dev, true);
+
+	local_bh_disable();
+	mt76_for_each_q_rx(mdev, i) {
+		if (mdev->q_rx[i].ndesc) {
+			napi_enable(&dev->mt76.napi[i]);
+			napi_schedule(&dev->mt76.napi[i]);
+		}
+	}
+	local_bh_enable();
+
+	local_bh_disable();
+	napi_enable(&dev->mt76.tx_napi);
+	napi_schedule(&dev->mt76.tx_napi);
+	local_bh_enable();
 
 	set_bit(MT76_STATE_INITIALIZED, &dev->mphy.state);
 

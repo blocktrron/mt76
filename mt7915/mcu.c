@@ -2048,7 +2048,7 @@ mt7915_firmware_state(struct mt7915_dev *dev, bool wa)
 			       wa ? FW_STATE_RDY : FW_STATE_FW_DOWNLOAD);
 
 	if (!mt76_poll_msec(dev, MT_TOP_MISC, MT_TOP_MISC_FW_STATE,
-			    state, 1000)) {
+			    state, 5000)) {
 		dev_err(dev->mt76.dev, "Timeout for initializing firmware\n");
 		return -EIO;
 	}
@@ -2389,7 +2389,7 @@ void mt7915_mcu_exit(struct mt7915_dev *dev)
 	mt76_connac_mcu_restart(&dev->mt76);
 	if (mt7915_firmware_state(dev, false)) {
 		dev_err(dev->mt76.dev, "Failed to exit mcu\n");
-		goto out;
+		// goto out;
 	}
 
 	mt76_wr(dev, MT_TOP_LPCR_HOST_BAND(0), MT_TOP_LPCR_HOST_FW_OWN);
