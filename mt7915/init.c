@@ -523,6 +523,18 @@ mt7915_mac_init_band(struct mt7915_dev *dev, u8 band)
 	      FIELD_PREP(MT_WTBLOFF_TOP_RSCR_RCPI_PARAM, 0x3);
 	mt76_rmw(dev, MT_WTBLOFF_TOP_RSCR(band), mask, set);
 
+	dev_warn(dev->mt76.dev, "MAC_INIT_BAND%d\n", band);
+	mt7915_print_reg(dev, MT_TMAC_CTCR0(band));
+	mt7915_print_reg(dev, MT_MDP_BNRCFR0(band));
+	mt7915_print_reg(dev, MT_MDP_BNRCFR1(band));
+	mt7915_print_reg(dev, MT_DMA_DCR0(band));
+	mt7915_print_reg(dev, MT_WF_RMAC_RSVD0(band));
+	mt7915_print_reg(dev, MT_WF_RMAC_MIB_AIRTIME0(band));
+	mt7915_print_reg(dev, MT_WF_RMAC_MIB_AIRTIME1(band));
+	mt7915_print_reg(dev, MT_WF_RMAC_MIB_AIRTIME3(band));
+	mt7915_print_reg(dev, MT_WF_RMAC_MIB_AIRTIME4(band));
+	mt7915_print_reg(dev, MT_WTBLOFF_TOP_RSCR(band));
+	
 	/* MT_TXD5_TX_STATUS_HOST (MPDU format) has higher priority than
 	 * MT_AGG_ACR_PPDU_TXS2H (PPDU format) even though ACR bit is set.
 	 */
@@ -621,6 +633,13 @@ void mt7915_mac_init(struct mt7915_dev *dev)
 				       MT_WTBL_UPDATE_ADM_COUNT_CLEAR);
 	for (i = 0; i < 2; i++)
 		mt7915_mac_init_band(dev, i);
+
+	dev_warn(dev->mt76.dev, "MAC_INIT\n");
+	mt7915_print_reg(dev, MT_WF_PP_TOP_RXQ_WFDMA_CF_5);
+	mt7915_print_reg(dev, MT_MDP_DCR0);
+	mt7915_print_reg(dev, MT_MDP_DCR1);
+	mt7915_print_reg(dev, MT_MDP_DCR2);
+	mt7915_print_reg(dev, MT_PLE_HOST_RPT0);
 
 	mt7915_init_led_mux(dev);
 }

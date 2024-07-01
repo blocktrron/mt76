@@ -589,6 +589,7 @@ void mt7915_update_channel(struct mt76_phy *mphy);
 int mt7915_mcu_muru_debug_set(struct mt7915_dev *dev, bool enable);
 int mt7915_mcu_muru_debug_get(struct mt7915_phy *phy);
 int mt7915_mcu_wed_enable_rx_stats(struct mt7915_dev *dev);
+int mt7915_firmware_state(struct mt7915_dev *dev, bool wa);
 int mt7915_init_debugfs(struct mt7915_phy *phy);
 void mt7915_debugfs_rx_fw_monitor(struct mt7915_dev *dev, const void *data, int len);
 bool mt7915_debugfs_rx_log(struct mt7915_dev *dev, const void *data, int len);
@@ -598,5 +599,11 @@ void mt7915_sta_add_debugfs(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 #endif
 int mt7915_mmio_wed_init(struct mt7915_dev *dev, void *pdev_ptr,
 			 bool pci, int *irq);
+
+static inline int mt7915_print_reg(struct mt7915_dev *dev, u32 reg)
+{
+	dev_warn(dev->mt76.dev, "reg:0x%08x val:0x%08x\n", reg, mt76_rr(dev, reg));
+	return 0;
+}
 
 #endif

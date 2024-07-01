@@ -5,6 +5,66 @@
 #include "../dma.h"
 #include "mac.h"
 
+
+static int mt7915_dump_all_regs(struct mt7915_dev *dev)
+{
+	u32 hif1_ofs = 0;
+	if (dev->hif2)
+		hif1_ofs = MT_WFDMA0_PCIE1(0) - MT_WFDMA0(0);
+
+	dev_warn(dev->mt76.dev, "MISC\n");
+	mt7915_print_reg(dev, MT_INT1_MASK_CSR);
+	mt7915_print_reg(dev, MT_INT1_SOURCE_CSR);
+	mt7915_print_reg(dev, MT_PCIE_MAC_INT_ENABLE);
+	mt7915_print_reg(dev, MT_PCIE1_MAC_INT_ENABLE);
+	mt7915_print_reg(dev, MT_TOP_MISC);
+	mt7915_print_reg(dev, MT_WFDMA0_EXT0_CFG);
+	mt7915_print_reg(dev, MT_WFDMA_HOST_CONFIG);
+	mt7915_print_reg(dev, MT_INT_WED_MASK_CSR);
+	mt7915_print_reg(dev, MT_INT_MASK_CSR);
+	mt7915_print_reg(dev, MT_WFDMA0_MCU_HOST_INT_ENA);
+	mt7915_print_reg(dev, MT_MCU_INT_EVENT);
+
+	dev_warn(dev->mt76.dev, "DMA_DISABLE\n");
+	mt7915_print_reg(dev, MT_WFDMA0_RST);
+	mt7915_print_reg(dev, MT_WFDMA1_RST);
+	mt7915_print_reg(dev, MT_WFDMA0_RST + hif1_ofs);
+	mt7915_print_reg(dev, MT_WFDMA1_RST + hif1_ofs);
+	mt7915_print_reg(dev, MT_WFDMA0_GLO_CFG);
+	mt7915_print_reg(dev, MT_WFDMA1_GLO_CFG);
+	mt7915_print_reg(dev, MT_WFDMA0_GLO_CFG + hif1_ofs);
+	mt7915_print_reg(dev, MT_WFDMA1_GLO_CFG + hif1_ofs);
+
+
+	dev_warn(dev->mt76.dev, "DMA_ENABLE\n");
+	dev_warn(dev->mt76.dev, " -- RST_DTX_PTR\n");
+	mt7915_print_reg(dev, MT_WFDMA0_RST_DTX_PTR);
+	mt7915_print_reg(dev, MT_WFDMA1_RST_DTX_PTR);
+	mt7915_print_reg(dev, MT_WFDMA0_RST_DTX_PTR + hif1_ofs);
+	mt7915_print_reg(dev, MT_WFDMA1_RST_DTX_PTR + hif1_ofs);
+
+	dev_warn(dev->mt76.dev, " -- PRI_DELAY_INT\n");
+	mt7915_print_reg(dev, MT_WFDMA0_PRI_DLY_INT_CFG0);
+	mt7915_print_reg(dev, MT_WFDMA1_PRI_DLY_INT_CFG0);
+	mt7915_print_reg(dev, MT_WFDMA0_PRI_DLY_INT_CFG1);
+	mt7915_print_reg(dev, MT_WFDMA0_PRI_DLY_INT_CFG2);
+	mt7915_print_reg(dev, MT_WFDMA0_PRI_DLY_INT_CFG0 + hif1_ofs);
+	mt7915_print_reg(dev, MT_WFDMA1_PRI_DLY_INT_CFG0 + hif1_ofs);
+	mt7915_print_reg(dev, MT_WFDMA0_PRI_DLY_INT_CFG1 + hif1_ofs);
+	mt7915_print_reg(dev, MT_WFDMA0_PRI_DLY_INT_CFG2 + hif1_ofs);
+
+	mt7915_print_reg(dev, MT_WFDMA0_BUSY_ENA);
+	mt7915_print_reg(dev, MT_WFDMA1_BUSY_ENA);
+	mt7915_print_reg(dev, MT_WFDMA0_BUSY_ENA + hif1_ofs);
+	mt7915_print_reg(dev, MT_WFDMA1_BUSY_ENA + hif1_ofs);
+
+	mt7915_print_reg(dev, MT_WFDMA0_GLO_CFG);
+
+	dev_warn(dev->mt76.dev, "DMA_INIT\n");
+	mt7915_print_reg(dev, MT_WFDMA_HOST_CONFIG);
+	return 0;
+}
+
 static int
 mt7915_init_tx_queues(struct mt7915_phy *phy, int idx, int n_desc, int ring_base)
 {
@@ -328,6 +388,8 @@ int mt7915_dma_start(struct mt7915_dev *dev, bool reset, bool wed_reset)
 	mt7915_irq_enable(dev, irq_mask);
 	mt7915_irq_disable(dev, 0);
 
+	mt7915_dump_all_regs(dev);
+
 	return 0;
 }
 
@@ -411,6 +473,8 @@ int mt7915_dma_init(struct mt7915_dev *dev, struct mt7915_phy *phy2)
 	u32 wa_rx_base, wa_rx_idx;
 	u32 hif1_ofs = 0;
 	int ret;
+
+	mt7915_dump_all_regs(dev);
 
 	mt7915_dma_config(dev);
 
