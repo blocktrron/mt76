@@ -197,6 +197,8 @@ mt7915_mcu_parse_response(struct mt76_dev *mdev, int cmd,
 static void
 mt7915_mcu_set_timeout(struct mt76_dev *mdev, int cmd)
 {
+	mdev->mcu.timeout = 3 * HZ;
+
 	if ((cmd & __MCU_CMD_FIELD_ID) != MCU_CMD_EXT_CID)
 		return;
 
@@ -2093,16 +2095,29 @@ mt7915_firmware_state(struct mt7915_dev *dev, bool wa)
 static int mt7915_load_firmware(struct mt7915_dev *dev)
 {
 	int ret;
+	int i = 0, j = 0;
+	int sem;
 
-	/* make sure fw is download state */
-	if (mt7915_firmware_state(dev, false)) {
-		/* restart firmware once */
+	/* Release Semaphore if taken */
+	sem = mt76_connac_mcu_patch_sem_ctrl(&dev->mt76, false);
+	dev_err(dev->mt76.dev, "Semaphore released ret=%d\n", sem);
+
+	/* Always restart MCU firmware */
+	for (i = 0; i < 5; i++) {
 		mt76_connac_mcu_restart(&dev->mt76);
-		ret = mt7915_firmware_state(dev, false);
-		if (ret) {
-			dev_err(dev->mt76.dev,
-				"Firmware is not ready for download\n");
-			return ret;
+
+		msleep(750);
+		
+		for (j = 0; j < 5; j++) {
+			ret = mt7915_firmware_state(dev, false);
+			dev_err(dev->mt76.dev, "Firmware download status ready=%d restart=%d read=%d status=%lu\n",
+					ret, i, j, mt76_get_field(dev, MT_TOP_MISC, MT_TOP_MISC_FW_STATE));
+			if (!ret) {
+				break;
+			}
+		}
+		if (!ret) {
+			break;
 		}
 	}
 
