@@ -1316,6 +1316,9 @@ mt7915_mac_restart(struct mt7915_dev *dev)
 	ext_phy = dev->mt76.phys[MT_BAND1];
 	phy2 = ext_phy ? ext_phy->priv : NULL;
 
+	/* Shut down MCU FW*/
+	mt7915_mcu_exit(dev);
+
 	if (dev->hif2) {
 		mt76_wr(dev, MT_INT1_MASK_CSR, 0x0);
 		mt76_wr(dev, MT_INT1_SOURCE_CSR, ~0);
