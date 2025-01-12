@@ -2079,10 +2079,12 @@ mt7915_firmware_state(struct mt7915_dev *dev, bool wa)
 {
 	u32 state = FIELD_PREP(MT_TOP_MISC_FW_STATE,
 			       wa ? FW_STATE_RDY : FW_STATE_FW_DOWNLOAD);
+	u32 read_state;
 
 	if (!mt76_poll_msec(dev, MT_TOP_MISC, MT_TOP_MISC_FW_STATE,
 			    state, 1000)) {
-		dev_err(dev->mt76.dev, "Timeout for initializing firmware\n");
+		read_state = mt76_get_field(dev, MT_TOP_MISC, MT_TOP_MISC_FW_STATE);
+		dev_err(dev->mt76.dev, "Timeout for initializing firmware %u\n", read_state);
 		return -EIO;
 	}
 	return 0;
