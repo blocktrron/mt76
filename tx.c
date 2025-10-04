@@ -197,6 +197,7 @@ mt76_tx_status_skb_get(struct mt76_dev *dev, struct mt76_wcid *wcid, int pktid,
 		 * and stop waiting for TXS callback.
 		 */
 		idr_remove(&wcid->pktid, cb->pktid);
+		dev_warn(dev->dev, "Timeout waiting for TX status report (wcid=%d pid=%d)\n", wcid->idx, cb->pktid);
 		__mt76_tx_status_skb_done(dev, skb, MT_TX_CB_TXS_FAILED |
 						    MT_TX_CB_TXS_DONE, list);
 	}
