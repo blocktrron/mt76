@@ -860,9 +860,11 @@ mt7915_sta_hw_queue_read(void *data, struct ieee80211_sta *sta)
 		if (val & BIT(offs))
 			continue;
 
+		mutex_lock(&dev->qctrl_mutex);
 		mt76_wr(dev, MT_FL_Q0_CTRL, ctrl | msta->wcid.idx);
 		qlen = mt76_get_field(dev, MT_FL_Q3_CTRL,
 				      GENMASK(11, 0));
+		mutex_unlock(&dev->qctrl_mutex);
 		seq_printf(s, "\tSTA %pM wcid %d: AC%d%d queued:%d\n",
 			   sta->addr, msta->wcid.idx,
 			   msta->vif->mt76.wmm_idx, ac, qlen);

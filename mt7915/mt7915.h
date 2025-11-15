@@ -83,6 +83,9 @@
 #define MT7915_CRIT_TEMP		110
 #define MT7915_MAX_TEMP			120
 
+#define MT7915_PLE_PURGE_MAX_ITER	64
+#define MT7915_PLE_QUEUE_TIMEOUT	(HZ * 5)
+
 struct mt7915_vif;
 struct mt7915_sta;
 struct mt7915_dfs_pulse;
@@ -131,6 +134,12 @@ struct mt7915_twt_flow {
 
 DECLARE_EWMA(avg_signal, 10, 8)
 
+struct mt7915_hw_queue_state {
+	u32 head;
+	u32 tail;
+	unsigned long last_update;
+};
+
 struct mt7915_sta {
 	struct mt76_wcid wcid; /* must be first */
 
@@ -145,6 +154,8 @@ struct mt7915_sta {
 	unsigned long changed;
 	unsigned long jiffies;
 	struct mt76_connac_sta_key_conf bip;
+
+	struct mt7915_hw_queue_state hwq_state[4];
 
 	struct {
 		u8 flowid_mask;
@@ -220,6 +231,8 @@ struct mt7915_phy {
 	u32 rx_ampdu_ts;
 	u32 ampdu_ref;
 
+	u8 stuck_queue_check;
+
 	struct mt76_mib_stats mib;
 	struct mt76_channel_state state_ts;
 
@@ -283,6 +296,8 @@ struct mt7915_dev {
 		struct mt7915_crash_data *crash_data;
 	} coredump;
 #endif
+
+	struct mutex qctrl_mutex;
 
 	struct list_head sta_rc_list;
 	struct list_head twt_list;

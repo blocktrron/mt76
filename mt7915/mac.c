@@ -1994,10 +1994,116 @@ void mt7915_mac_sta_rc_work(struct work_struct *work)
 	spin_unlock_bh(&dev->mt76.sta_poll_lock);
 }
 
+static void
+mt7915_sta_read_hw_queue(struct ieee80211_sta *sta,
+			 u8 ac, u16 *head, u16 *tail, u16 *qlen)
+{
+	struct mt7915_sta *msta = (struct mt7915_sta *)sta->drv_priv;
+	struct mt7915_dev *dev = msta->vif->phy->dev;
+	u32 q0_ctrl, q2_ctrl, q3_ctrl;
+
+	q0_ctrl = MT_FL_Q0_CTRL_EXECUTE | BIT(11) | FIELD_PREP(MT_FL_Q0_CTRL_SRC_QID, ac);
+
+	mutex_lock(&dev->qctrl_mutex);
+	mt76_wr(dev, MT_FL_Q0_CTRL, q0_ctrl | msta->wcid.idx);
+	q2_ctrl = mt76_rr(dev, MT_FL_Q2_CTRL);
+	q3_ctrl = mt76_rr(dev, MT_FL_Q3_CTRL);
+	mutex_unlock(&dev->qctrl_mutex);
+
+	*head = FIELD_GET(MT_FL_Q2_CTRL_HFID, q2_ctrl);
+	*tail = FIELD_GET(MT_FL_Q2_CTRL_TFID, q2_ctrl);
+	*qlen = FIELD_GET(MT_FL_Q3_CTRL_PKT_NUM, q3_ctrl);
+}
+
+static void mt7915_purge_ac(struct ieee80211_sta *sta, int ac, int fid_start, int fid_end)
+{
+	struct mt7915_sta *msta = (struct mt7915_sta *)sta->drv_priv;
+	struct mt7915_dev *dev = msta->vif->phy->dev;
+	u32 deq_ctrl[3];
+
+	deq_ctrl[0] = MT_PLE_DEQ_0_EXECUTE | BIT(11);
+	deq_ctrl[0] |= FIELD_PREP(MT_PLE_DEQ_0_DEQ_SRC_WCID, msta->wcid.idx);
+	deq_ctrl[0] |= FIELD_PREP(MT_PLE_DEQ_0_SRC_QID, ac);
+	deq_ctrl[0] |= FIELD_PREP(MT_PLE_DEQ_0_DEQ_SUB_TYPE, 0x2);
+	deq_ctrl[0] |= FIELD_PREP(MT_PLE_DEQ_0_ENQ_SUB_TYPE, 0x1);
+	deq_ctrl[0] |= MT_PLE_DEQ_0_ENQ_VALID;
+
+	deq_ctrl[1] = FIELD_PREP(MT_PLE_DEQ_1_FID_START, fid_start);
+	deq_ctrl[1] |= FIELD_PREP(MT_PLE_DEQ_1_FID_END, fid_end);
+
+	deq_ctrl[2] = FIELD_PREP(MT_PLE_DEQ_2_DST_QID, 0x1f);
+
+	mt76_wr(dev, MT_PLE_DEQ(1), deq_ctrl[1]);
+	mt76_wr(dev, MT_PLE_DEQ(2), deq_ctrl[2]);
+	mt76_wr(dev, MT_PLE_DEQ(0), deq_ctrl[0]);
+}
+
+static int
+mt7915_sta_purge_hw_queue(struct ieee80211_sta *sta, u8 ac)
+{
+	u16 head_frame_id, tail_frame_id, q_len;
+	int i = MT7915_PLE_PURGE_MAX_ITER;
+
+	do {
+		mt7915_sta_read_hw_queue(sta, ac, &head_frame_id,
+					 &tail_frame_id, &q_len);
+
+		if (q_len == 0)
+			break;
+
+		mt7915_purge_ac(sta, ac, head_frame_id, head_frame_id);
+	} while (--i > 0);
+
+	return MT7915_PLE_PURGE_MAX_ITER - i;
+}
+
+static void
+mt7915_sta_check_hw_queues(void *data, struct ieee80211_sta *sta)
+{
+	struct mt7915_sta *msta = (struct mt7915_sta *)sta->drv_priv;
+	struct mt7915_dev *dev = msta->vif->phy->dev;
+	struct mt7915_hw_queue_state *hwq;
+	bool *purged = data;
+
+	u16 head_frame_id, tail_frame_id, q_len;
+	u32 q_empty;
+	u8 ac;
+
+	for (ac = 0; ac < 4; ac++) {
+		hwq = &msta->hwq_state[ac];
+
+		/* Check if STA has frames pending. */
+		q_empty = mt76_rr(dev, MT_PLE_AC_QEMPTY(ac, msta->wcid.idx >> 5));
+		if (q_empty & BIT(msta->wcid.idx & GENMASK(4, 0))) {
+			/* Queue empty */
+			hwq->head = 0xFFF;
+			hwq->last_update = jiffies;
+			continue;
+		}
+
+		/* Check hardware queue state */
+		mt7915_sta_read_hw_queue(sta, ac, &head_frame_id, &tail_frame_id, &q_len);
+		if (hwq->head != head_frame_id) {
+			/* Queue moved, update */
+			hwq->last_update = jiffies;
+			hwq->head = head_frame_id;
+			continue;
+		}
+
+		/* Begin purge after queue detected stuck for QUEUE_TIMEOUT */
+		if (time_is_after_jiffies(hwq->last_update + MT7915_PLE_QUEUE_TIMEOUT))
+			continue;
+
+		mt7915_sta_purge_hw_queue(sta, ac);
+		*purged = true;
+	}
+}
+
 void mt7915_mac_work(struct work_struct *work)
 {
 	struct mt7915_phy *phy;
 	struct mt76_phy *mphy;
+	bool purged = false;
 
 	mphy = (struct mt76_phy *)container_of(work, struct mt76_phy,
 					       mac_work.work);
@@ -2019,6 +2125,18 @@ void mt7915_mac_work(struct work_struct *work)
 	mutex_unlock(&mphy->dev->mutex);
 
 	mt76_tx_status_check(mphy->dev, false);
+
+	if (++phy->stuck_queue_check >= 5) {
+		/* Lock MCU Lock to avoid command timeouts */
+		mutex_lock(&mphy->dev->mcu.mutex);
+		ieee80211_iterate_stations_atomic(mphy->hw,
+						  mt7915_sta_check_hw_queues,
+						  &purged);
+		if (purged)
+			usleep_range(10000, 15000);
+		mutex_unlock(&mphy->dev->mcu.mutex);
+		phy->stuck_queue_check = 0;
+	}
 
 	ieee80211_queue_delayed_work(mphy->hw, &mphy->mac_work,
 				     MT7915_WATCHDOG_TIME);
