@@ -826,6 +826,7 @@ mt7915_hw_queue_read(struct seq_file *s, u32 size,
 			continue;
 
 		ctrl = BIT(31) | (map[i].pid << 10) | ((u32)map[i].qid << 24);
+		mutex_lock(&dev->qctrl_mutex);
 		mt76_wr(dev, MT_FL_Q0_CTRL, ctrl);
 
 		head = mt76_get_field(dev, MT_FL_Q2_CTRL,
@@ -834,6 +835,7 @@ mt7915_hw_queue_read(struct seq_file *s, u32 size,
 				      GENMASK(27, 16));
 		queued = mt76_get_field(dev, MT_FL_Q3_CTRL,
 					GENMASK(11, 0));
+		mutex_unlock(&dev->qctrl_mutex);
 
 		seq_printf(s, "\t%s: ", map[i].name);
 		seq_printf(s, "queued:0x%03x head:0x%03x tail:0x%03x\n",
