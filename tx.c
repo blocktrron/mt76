@@ -498,6 +498,49 @@ mt76_txq_stopped(struct mt76_queue *q)
 	       q->queued + MT_TXQ_FREE_THR >= q->ndesc;
 }
 
+static void
+mt76_send_bar(struct mt76_dev *dev, struct ieee80211_vif *vif,
+	      struct ieee80211_sta *sta, struct ieee80211_txq *txq,
+	      u16 ssn)
+{
+	struct ieee80211_hw *hw = dev->phy.hw;
+	struct mt76_wcid *wcid = (struct mt76_wcid *)sta->drv_priv;
+	struct sk_buff *skb;
+	struct ieee80211_bar *bar;
+	u16 bar_control = 0;
+	struct mt76_queue *q;
+
+
+	skb = dev_alloc_skb(sizeof(*bar) + hw->extra_tx_headroom);
+	if (!skb)
+		return;
+
+	skb_reserve(skb, hw->extra_tx_headroom);
+	bar = skb_put_zero(skb, sizeof(*bar));
+	bar->frame_control = cpu_to_le16(IEEE80211_FTYPE_CTL |
+					 IEEE80211_STYPE_BACK_REQ);
+	memcpy(bar->ra, sta->addr, ETH_ALEN);
+	memcpy(bar->ta, vif->addr, ETH_ALEN);
+	bar_control |= (u16)IEEE80211_BAR_CTRL_ACK_POLICY_NORMAL;
+	bar_control |= (u16)IEEE80211_BAR_CTRL_CBMTID_COMPRESSED_BA;
+	bar_control |= (u16)(txq->tid << IEEE80211_BAR_CTRL_TID_INFO_SHIFT);
+	bar->control = cpu_to_le16(bar_control);
+	bar->start_seq_num = cpu_to_le16(ssn);
+
+	IEEE80211_SKB_CB(skb)->flags |= IEEE80211_TX_INTFL_DONT_ENCRYPT |
+					IEEE80211_TX_CTL_REQ_TX_STATUS;
+	
+	skb_set_queue_mapping(skb, txq->ac);
+
+	/* Direct TX */
+	q = dev->phy.q_tx[txq->ac];
+	spin_lock(&q->lock);
+	__mt76_tx_queue_skb(&dev->phy, txq->ac, skb, wcid, sta, NULL);
+	dev->queue_ops->kick(dev, q);
+	spin_unlock(&q->lock);
+}
+
+
 static int
 mt76_txq_send_burst(struct mt76_phy *phy, struct mt76_queue *q,
 		    struct mt76_txq *mtxq, struct mt76_wcid *wcid)
@@ -627,10 +670,9 @@ mt76_txq_schedule_list(struct mt76_phy *phy, enum mt76_txq_id qid)
 			struct ieee80211_sta *sta = txq->sta;
 			struct ieee80211_vif *vif = txq->vif;
 			u16 agg_ssn = mtxq->agg_ssn;
-			u8 tid = txq->tid;
 
 			mtxq->send_bar = false;
-			ieee80211_send_bar(vif, sta->addr, tid, agg_ssn);
+			mt76_send_bar(dev, vif, sta, txq, agg_ssn);
 		}
 
 		if (!mt76_txq_stopped(q))
