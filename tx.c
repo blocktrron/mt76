@@ -90,6 +90,7 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
 			  struct sk_buff_head *list)
 {
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
+	struct ieee80211_bar *bar = (struct ieee80211_bar *)skb->data;
 	struct mt76_tx_cb *cb = mt76_tx_skb_cb(skb);
 	u8 done = MT_TX_CB_DMA_DONE | MT_TX_CB_TXS_DONE;
 
@@ -102,6 +103,16 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
 	/* Tx status can be unreliable. if it fails, mark the frame as ACKed */
 	if (flags & MT_TX_CB_TXS_FAILED &&
 	    (dev->drv->drv_flags & MT_DRV_IGNORE_TXS_FAILED)) {
+		info->status.rates[0].count = 0;
+		info->status.rates[0].idx = -1;
+		info->flags |= IEEE80211_TX_STAT_ACK;
+	}
+
+	/* Check if this was a BAR which is marked as acked */
+	if (unlikely(dev->drv->drv_flags & MT_DRV_MANUAL_BAR_TRACKING) &&
+		     ieee80211_is_back_req(bar->frame_control) &&
+		     !(info->flags & IEEE80211_TX_STAT_ACK) &&
+		     mt76_pending_bar_done(dev, bar)) {
 		info->status.rates[0].count = 0;
 		info->status.rates[0].idx = -1;
 		info->flags |= IEEE80211_TX_STAT_ACK;
@@ -328,6 +339,7 @@ __mt76_tx_queue_skb(struct mt76_phy *phy, int qid, struct sk_buff *skb,
 		    bool *stop)
 {
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
+	struct ieee80211_bar *bar = (struct ieee80211_bar *)skb->data;
 	struct mt76_queue *q = phy->q_tx[qid];
 	struct mt76_dev *dev = phy->dev;
 	bool non_aql;
@@ -342,6 +354,10 @@ __mt76_tx_queue_skb(struct mt76_phy *phy, int qid, struct sk_buff *skb,
 	wcid = (struct mt76_wcid *)sta->drv_priv;
 	if (!wcid->sta)
 		return idx;
+
+	if (unlikely(dev->drv->drv_flags & MT_DRV_MANUAL_BAR_TRACKING &&
+		     ieee80211_is_back_req(bar->frame_control)))
+		mt76_pending_bar_add(dev, bar);
 
 	q->entry[idx].wcid = wcid->idx;
 

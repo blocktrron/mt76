@@ -730,6 +730,9 @@ mt76_alloc_device(struct device *pdev, unsigned int size,
 	INIT_DELAYED_WORK(&dev->scan_work, mt76_scan_work);
 	spin_lock_init(&dev->scan_lock);
 
+	INIT_LIST_HEAD(&dev->pending_bar_list);
+	spin_lock_init(&dev->pending_bar_lock);
+
 	for (i = 0; i < ARRAY_SIZE(dev->q_rx); i++)
 		skb_queue_head_init(&dev->rx_skb[i]);
 
@@ -1352,6 +1355,88 @@ skip_hdr_check:
 		status->flag |= RX_FLAG_PN_VALIDATED;
 }
 
+static u8
+mt76_bar_tid(struct ieee80211_bar *bar)
+{
+	return (__le16_to_cpu(bar->control) & IEEE80211_BAR_CTRL_TID_INFO_MASK) >>
+	       IEEE80211_BAR_CTRL_TID_INFO_SHIFT;
+}
+
+struct mt76_pending_bar *
+mt76_pending_bar_add(struct mt76_dev *dev, struct ieee80211_bar *bar)
+{
+	struct mt76_pending_bar *pending;
+
+	pending = kzalloc(sizeof(*pending), GFP_ATOMIC);
+	if (!pending)
+		return NULL;
+
+	memcpy(pending->ra, bar->ra, ETH_ALEN);
+	memcpy(pending->ta, bar->ta, ETH_ALEN);
+
+	pending->tid = mt76_bar_tid(bar);
+	pending->ssn = __le16_to_cpu(bar->start_seq_num);
+
+	spin_lock_bh(&dev->pending_bar_lock);
+	list_add_tail_rcu(&pending->list, &dev->pending_bar_list);
+	spin_unlock_bh(&dev->pending_bar_lock);
+
+	return pending;
+}
+
+void
+mt76_pending_bar_ack(struct mt76_dev *dev, struct ieee80211_bar *bar)
+{
+	struct mt76_pending_bar *pending;
+
+	rcu_read_lock();
+
+	list_for_each_entry_rcu(pending, &dev->pending_bar_list, list) {
+		if (!ether_addr_equal(pending->ra, bar->ta) ||
+		    !ether_addr_equal(pending->ta, bar->ra))
+			continue;
+
+		if (pending->tid != mt76_bar_tid(bar) ||
+		    pending->ssn != __le16_to_cpu(bar->start_seq_num))
+			continue;
+
+		spin_lock_bh(&dev->pending_bar_lock);
+		pending->ack = true;
+		spin_unlock_bh(&dev->pending_bar_lock);
+		break;
+	}
+
+	rcu_read_unlock();
+}
+
+int
+mt76_pending_bar_done(struct mt76_dev *dev, struct ieee80211_bar *bar)
+{
+	struct mt76_pending_bar *pending;
+	int ret = 0;
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(pending, &dev->pending_bar_list, list) {
+		if (!ether_addr_equal(pending->ra, bar->ra) ||
+		    !ether_addr_equal(pending->ta, bar->ta))
+			continue;
+
+		if (pending->tid != mt76_bar_tid(bar) ||
+		    pending->ssn != __le16_to_cpu(bar->start_seq_num))
+			continue;
+
+		ret |= !!pending->ack;
+		spin_lock_bh(&dev->pending_bar_lock);
+		list_del_rcu(&pending->list);
+		spin_unlock_bh(&dev->pending_bar_lock);
+
+		kfree_rcu(pending, rcu_head);
+	}
+
+	rcu_read_unlock();
+	return ret;
+}
+
 static void
 mt76_airtime_report(struct mt76_dev *dev, struct mt76_rx_status *status,
 		    int len)
@@ -1463,6 +1548,10 @@ mt76_check_sta(struct mt76_dev *dev, struct sk_buff *skb)
 	}
 
 	mt76_airtime_check(dev, skb);
+
+	if (unlikely(dev->drv->drv_flags & MT_DRV_MANUAL_BAR_TRACKING) &&
+		     ieee80211_is_back(hdr->frame_control))
+		mt76_pending_bar_ack(dev, (struct ieee80211_bar *)hdr);
 
 	if (!wcid || !wcid->sta)
 		return;

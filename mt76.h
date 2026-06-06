@@ -487,6 +487,19 @@ struct mt76_rx_tid {
 	struct sk_buff *reorder_buf[];
 };
 
+struct mt76_pending_bar {
+	struct list_head list;
+	struct rcu_head rcu_head;
+
+	u8 ra[ETH_ALEN];
+	u8 ta[ETH_ALEN];
+
+	u16 tid;
+	u16 ssn;
+
+	u8 ack:1;
+};
+
 #define MT_TX_CB_DMA_DONE		BIT(0)
 #define MT_TX_CB_TXS_DONE		BIT(1)
 #define MT_TX_CB_TXS_FAILED		BIT(2)
@@ -544,6 +557,7 @@ struct mt76_hw_cap {
 	bool has_6ghz;
 };
 
+#define MT_DRV_MANUAL_BAR_TRACKING	BIT(8)
 #define MT_DRV_TXWI_NO_FREE		BIT(0)
 #define MT_DRV_TX_ALIGNED4_SKBS		BIT(1)
 #define MT_DRV_SW_RX_AIRTIME		BIT(2)
@@ -1001,6 +1015,9 @@ struct mt76_dev {
 
 	struct list_head sta_poll_list;
 	spinlock_t sta_poll_lock;
+
+	struct list_head pending_bar_list;
+	spinlock_t pending_bar_lock;
 
 	u32 rev;
 
@@ -1567,6 +1584,13 @@ void mt76_rx_aggr_stop(struct mt76_dev *dev, struct mt76_wcid *wcid, u8 tid);
 
 void mt76_wcid_key_setup(struct mt76_dev *dev, struct mt76_wcid *wcid,
 			 struct ieee80211_key_conf *key);
+
+struct mt76_pending_bar *
+mt76_pending_bar_add(struct mt76_dev *dev, struct ieee80211_bar *bar);
+void
+mt76_pending_bar_ack(struct mt76_dev *dev, struct ieee80211_bar *bar);
+int
+mt76_pending_bar_done(struct mt76_dev *dev, struct ieee80211_bar *bar);
 
 void mt76_tx_status_lock(struct mt76_dev *dev, struct sk_buff_head *list)
 			 __acquires(&dev->status_lock);
