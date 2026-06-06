@@ -181,7 +181,7 @@ mt7603_mac_init(struct mt7603_dev *dev)
 	mt76_set(dev, MT_WF_RMACDR, MT_WF_RMACDR_MAXLEN_20BIT);
 	mt76_rmw(dev, MT_WF_RMAC_MAXMINLEN, 0xffffff, 0x19000);
 
-	mt76_wr(dev, MT_WF_RFCR1, 0);
+	mt76_wr(dev, MT_WF_RFCR1, MT_WF_RFCR1_RX_BA_EN);
 
 	mt76_set(dev, MT_TMAC_TCR, MT_TMAC_TCR_RX_RIFS_MODE);
 

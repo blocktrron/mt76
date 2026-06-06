@@ -263,8 +263,9 @@ mt7603_configure_filter(struct ieee80211_hw *hw, unsigned int changed_flags,
 			   MT_WF_RFCR_DROP_BCAST |
 			   MT_WF_RFCR_DROP_DUPLICATE |
 			   MT_WF_RFCR_DROP_A2_BSSID |
-			   MT_WF_RFCR_DROP_UNWANTED_CTL |
 			   MT_WF_RFCR_DROP_STBC_MULTI);
+
+	dev->rxfilter |= MT_WF_RFCR_DROP_UNWANTED_CTL;
 
 	MT76_FILTER(OTHER_BSS, MT_WF_RFCR_DROP_OTHER_TIM |
 			       MT_WF_RFCR_DROP_A3_MAC |

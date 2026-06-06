@@ -463,7 +463,10 @@ enum {
 
 #define MT_WF_RMAC_CH_FREQ		MT_WF_RMAC(0x090)
 #define MT_WF_RMAC_MAXMINLEN		MT_WF_RMAC(0x098)
+
 #define MT_WF_RFCR1			MT_WF_RMAC(0x0a4)
+#define MT_WF_RFCR1_RX_BA_EN		BIT(14)
+
 #define MT_WF_RMAC_TMR_PA		MT_WF_RMAC(0x0e0)
 
 #define MT_WF_SEC_BASE			0x21a00
