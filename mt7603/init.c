@@ -7,7 +7,7 @@
 
 const struct mt76_driver_ops mt7603_drv_ops = {
 	.txwi_size = MT_TXD_SIZE,
-	.drv_flags = MT_DRV_SW_RX_AIRTIME,
+	.drv_flags = MT_DRV_SW_RX_AIRTIME | MT_DRV_MANUAL_BAR_TRACKING,
 	.survey_flags = SURVEY_INFO_TIME_TX,
 	.tx_prepare_skb = mt7603_tx_prepare_skb,
 	.tx_complete_skb = mt7603_tx_complete_skb,
