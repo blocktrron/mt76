@@ -1478,7 +1478,7 @@ static void mt7615_mac_add_txs(struct mt7615_dev *dev, void *data)
 	pid = le32_get_bits(txs_data[0], MT_TXS0_PID);
 	wcidx = le32_get_bits(txs_data[2], MT_TXS2_WCID);
 
-	if (pid == MT_PACKET_ID_NO_ACK)
+	if (pid == MT_PACKET_ID_NO_ACK || pid == MT_PACKET_ID_BCN)
 		return;
 
 	if (wcidx >= MT7615_WTBL_SIZE)

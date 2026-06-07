@@ -1260,6 +1260,19 @@ void mt7603_mac_add_txs(struct mt7603_dev *dev, void *data)
 	pid = le32_get_bits(txs_data[4], MT_TXS4_PID);
 	wcidx = le32_get_bits(txs_data[3], MT_TXS3_WCID);
 
+	if (pid == MT_PACKET_ID_BCN) {
+		u32 txs = le32_to_cpu(txs_data[4]);
+		int count = FIELD_GET(MT_TXS4_TX_COUNT, txs);
+		if (count >= 1 && dev->beacon_tx_dead_check) {
+			pr_warn("Beacon TX recovered, failed count %d", dev->beacon_tx_dead_check);
+			dev->beacon_tx_dead_check = 0;
+		} else if (count == 0) {
+			dev->beacon_tx_dead_check++;
+			pr_warn("Beacon TX failed, failed count %d", dev->beacon_tx_dead_check);
+		}
+		return;
+	}
+
 	if (pid == MT_PACKET_ID_NO_ACK)
 		return;
 
@@ -1455,6 +1468,7 @@ static void mt7603_mac_watchdog_reset(struct mt7603_dev *dev)
 	}
 
 	if (dev->reset_cause[RESET_CAUSE_RESET_FAILED] ||
+	    dev->cur_reset_cause == RESET_CAUSE_BEACON_TX_DEAD ||
 	    dev->cur_reset_cause == RESET_CAUSE_RX_PSE_BUSY)
 		mt7603_pse_reset(dev);
 
@@ -1844,6 +1858,9 @@ void mt7603_mac_work(struct work_struct *work)
 	if (mt7603_watchdog_check(dev, &dev->rx_pse_check,
 				  RESET_CAUSE_RX_PSE_BUSY,
 				  mt7603_rx_pse_busy) ||
+		mt7603_watchdog_check(dev, &dev->beacon_tx_dead_check,
+				  RESET_CAUSE_BEACON_TX_DEAD,
+				  NULL) ||
 	    mt7603_watchdog_check(dev, &dev->beacon_check,
 				  RESET_CAUSE_BEACON_STUCK,
 				  NULL) ||
@@ -1861,6 +1878,7 @@ void mt7603_mac_work(struct work_struct *work)
 				  NULL) ||
 	    dev->reset_cause[RESET_CAUSE_RESET_FAILED]) {
 		dev->beacon_check = 0;
+		dev->beacon_tx_dead_check = 0;
 		dev->tx_dma_check = 0;
 		dev->tx_hang_check = 0;
 		dev->rx_dma_check = 0;

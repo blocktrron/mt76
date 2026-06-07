@@ -140,6 +140,10 @@ mt76_tx_status_skb_add(struct mt76_dev *dev, struct mt76_wcid *wcid,
 
 	memset(cb, 0, sizeof(*cb));
 
+	if (ieee80211_is_mgmt(hdr->frame_control) &&
+	    ieee80211_is_beacon(hdr->frame_control))
+		return MT_PACKET_ID_BCN;
+
 	if (!wcid || !rcu_access_pointer(dev->wcid[wcid->idx]))
 		return MT_PACKET_ID_NO_ACK;
 

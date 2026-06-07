@@ -559,7 +559,8 @@ void mt76x02_send_tx_status(struct mt76x02_dev *dev,
 	u32 ac = 0;
 	int len = 0;
 
-	if (stat->pktid == MT_PACKET_ID_NO_ACK)
+	if (stat->pktid == MT_PACKET_ID_NO_ACK ||
+	    stat->pktid == MT_PACKET_ID_BCN)
 		return;
 
 	rcu_read_lock();

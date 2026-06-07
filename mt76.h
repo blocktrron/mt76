@@ -508,7 +508,8 @@ struct mt76_pending_bar {
 #define MT_PACKET_ID_NO_ACK		0
 #define MT_PACKET_ID_NO_SKB		1
 #define MT_PACKET_ID_WED		2
-#define MT_PACKET_ID_FIRST		3
+#define MT_PACKET_ID_BCN		3
+#define MT_PACKET_ID_FIRST		4
 #define MT_PACKET_ID_HAS_RATE		BIT(7)
 /* This is timer for when to give up when waiting for TXS callback,
  * with starting time being the time at which the DMA_DONE callback
