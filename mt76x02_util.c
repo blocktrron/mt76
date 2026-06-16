@@ -217,6 +217,7 @@ void mt76x02_configure_filter(struct ieee80211_hw *hw,
 	mutex_lock(&dev->mt76.mutex);
 
 	dev->mt76.rxfilter &= ~MT_RX_FILTR_CFG_OTHER_BSS;
+	dev->mt76.rxfilter &= ~MT_RX_FILTR_CFG_BA;
 
 	MT76_FILTER(FCSFAIL, MT_RX_FILTR_CFG_CRC_ERR);
 	MT76_FILTER(PLCPFAIL, MT_RX_FILTR_CFG_PHY_ERR);
@@ -224,7 +225,6 @@ void mt76x02_configure_filter(struct ieee80211_hw *hw,
 			     MT_RX_FILTR_CFG_CTS |
 			     MT_RX_FILTR_CFG_CFEND |
 			     MT_RX_FILTR_CFG_CFACK |
-			     MT_RX_FILTR_CFG_BA |
 			     MT_RX_FILTR_CFG_CTRL_RSV);
 	MT76_FILTER(PSPOLL, MT_RX_FILTR_CFG_PSPOLL);
 
