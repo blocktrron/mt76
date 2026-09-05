@@ -1486,6 +1486,14 @@ static void mt7603_mac_watchdog_reset(struct mt7603_dev *dev)
 	    dev->cur_reset_cause == RESET_CAUSE_RX_PSE_BUSY)
 		mt7603_pse_reset(dev);
 
+	if (dev->cur_reset_cause == RESET_CAUSE_FQ_STUCK &&
+	    dev->reset_cause[RESET_CAUSE_FQ_STUCK] % 10 == 0) {
+		dev_warn(dev->mt76.dev, "Applying extended PSE reset - FQ stuck reset count %d\n",
+				dev->reset_cause[RESET_CAUSE_FQ_STUCK]);
+		mt7603_pse_reset(dev);
+	}
+
+
 	if (!dev->reset_cause[RESET_CAUSE_RESET_FAILED]) {
 		mt7603_mac_dma_start(dev);
 
