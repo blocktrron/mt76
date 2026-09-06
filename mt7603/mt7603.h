@@ -93,6 +93,7 @@ enum mt7603_reset_cause {
 	RESET_CAUSE_TX_HANG,
 	RESET_CAUSE_TX_BUSY,
 	RESET_CAUSE_RX_BUSY,
+	RESET_CAUSE_BCAST_TXS_DEAD,
 	RESET_CAUSE_FQ_STUCK,
 	RESET_CAUSE_BEACON_STUCK,
 	RESET_CAUSE_RX_PSE_BUSY,
@@ -142,8 +143,11 @@ struct mt7603_dev {
 	s8 sensitivity;
 	u8 sensitivity_limit;
 
+	bool bcast_queued;
+
 	u8 fq_check;
 	u8 beacon_check;
+	u8 bcast_check;
 	u8 tx_hang_check;
 	u8 tx_dma_check;
 	u8 rx_dma_check;
