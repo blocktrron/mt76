@@ -1288,10 +1288,17 @@ void mt7603_mac_add_txs(struct mt7603_dev *dev, void *data)
 	pid = le32_get_bits(txs_data[4], MT_TXS4_PID);
 	wcidx = le32_get_bits(txs_data[3], MT_TXS3_WCID);
 
-	if (pid == MT_PACKET_ID_NO_ACK)
-		return;
-
 	rcu_read_lock();
+
+	if (pid == MT_PACKET_ID_NO_ACK) {
+		/* Check if WCID is of a VIF */
+		if (wcidx < MT7603_WTBL_STA)
+			goto out;
+
+		/* Reset broadcast check */
+		dev->bcast_check = 0;
+		goto out;
+	}
 
 	wcid = mt76_wcid_ptr(dev, wcidx);
 	if (!wcid)
@@ -1347,6 +1354,7 @@ static void mt7603_pse_reset(struct mt7603_dev *dev)
 		mt76_clear(dev, MT_MCU_DEBUG_RESET, MT_MCU_DEBUG_RESET_PSE_S);
 
 	/* Reset PSE */
+	dev->bcast_check = 0;
 	mt76_set(dev, MT_MCU_DEBUG_RESET, MT_MCU_DEBUG_RESET_PSE);
 
 	if (!mt76_poll_msec(dev, MT_MCU_DEBUG_RESET,
@@ -1483,6 +1491,7 @@ static void mt7603_mac_watchdog_reset(struct mt7603_dev *dev)
 	}
 
 	if (dev->reset_cause[RESET_CAUSE_RESET_FAILED] ||
+	    dev->cur_reset_cause == RESET_CAUSE_BCAST_TXS_DEAD ||
 	    dev->cur_reset_cause == RESET_CAUSE_RX_PSE_BUSY)
 		mt7603_pse_reset(dev);
 
@@ -1906,6 +1915,9 @@ void mt7603_mac_work(struct work_struct *work)
 	if (mt7603_watchdog_check(dev, &dev->rx_pse_check,
 				  RESET_CAUSE_RX_PSE_BUSY,
 				  mt7603_rx_pse_busy) ||
+	    mt7603_watchdog_check(dev, &dev->bcast_check,
+				  RESET_CAUSE_BCAST_TXS_DEAD,
+				  NULL) ||
 	    mt7603_watchdog_check(dev, &dev->fq_check,
 				  RESET_CAUSE_FQ_STUCK,
 				  NULL) ||
