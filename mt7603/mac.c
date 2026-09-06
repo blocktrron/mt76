@@ -1287,8 +1287,13 @@ void mt7603_mac_add_txs(struct mt7603_dev *dev, void *data)
 	pid = le32_get_bits(txs_data[4], MT_TXS4_PID);
 	wcidx = le32_get_bits(txs_data[3], MT_TXS3_WCID);
 
-	if (pid == MT_PACKET_ID_NO_ACK)
+	if (pid == MT_PACKET_ID_NO_ACK) {
+		if (wcidx >= MT7603_WTBL_STA) {
+			/* Reset broadcast check */
+			dev->num_pending_bcast = 0;
+		}
 		return;
+	}
 
 	rcu_read_lock();
 
@@ -1347,6 +1352,10 @@ static void mt7603_pse_reset(struct mt7603_dev *dev)
 
 	/* Reset PSE */
 	mt76_set(dev, MT_MCU_DEBUG_RESET, MT_MCU_DEBUG_RESET_PSE);
+
+	/* Reset broadcast TXS loss trigger & counter */
+	dev->num_pending_bcast = 0;
+	dev->bcast_check = 0;
 
 	if (!mt76_poll_msec(dev, MT_MCU_DEBUG_RESET,
 			    MT_MCU_DEBUG_RESET_PSE_S,
@@ -1482,6 +1491,7 @@ static void mt7603_mac_watchdog_reset(struct mt7603_dev *dev)
 	}
 
 	if (dev->reset_cause[RESET_CAUSE_RESET_FAILED] ||
+	    dev->cur_reset_cause == RESET_CAUSE_BCAST_TXS_TIMEOUT ||
 	    dev->cur_reset_cause == RESET_CAUSE_RX_PSE_BUSY)
 		mt7603_pse_reset(dev);
 
@@ -1603,6 +1613,16 @@ out:
 	    (MT_INT_RX_DONE(0) | MT_INT_RX_DONE(1)))
 		return false;
 
+	return true;
+}
+
+static bool mt7603_bcast_pending(struct mt7603_dev *dev)
+{
+	if (dev->num_pending_bcast < 25)
+		return false;
+
+	dev->num_pending_bcast = 0;
+	dev->bcast_check = MT7603_WATCHDOG_TIMEOUT;
 	return true;
 }
 
@@ -1905,6 +1925,9 @@ void mt7603_mac_work(struct work_struct *work)
 	if (mt7603_watchdog_check(dev, &dev->rx_pse_check,
 				  RESET_CAUSE_RX_PSE_BUSY,
 				  mt7603_rx_pse_busy) ||
+	    mt7603_watchdog_check(dev, &dev->bcast_check,
+				  RESET_CAUSE_BCAST_TXS_TIMEOUT,
+				  mt7603_bcast_pending) ||
 	    mt7603_watchdog_check(dev, &dev->fq_check,
 				  RESET_CAUSE_FQ_STUCK,
 				  NULL) ||
