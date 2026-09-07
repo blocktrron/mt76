@@ -45,6 +45,9 @@ mt7603_mcu_skb_send_msg(struct mt76_dev *mdev, struct sk_buff *skb,
 	struct mt7603_mcu_txd *txd;
 	u8 seq;
 
+	if (dev->mcu_hang)
+		return -EIO;
+
 	mdev->mcu.timeout = 3 * HZ;
 
 	seq = ++mdev->mcu.msg_seq & 0xf;
