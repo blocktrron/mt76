@@ -54,6 +54,9 @@ mt7603_rx_loopback_skb(struct mt7603_dev *dev, struct sk_buff *skb)
 
 	hwq = wmm_queue_map[IEEE80211_AC_BE];
 	if (ieee80211_is_data_qos(hdr->frame_control)) {
+		if (skb->len < MT_TXD_SIZE + ieee80211_hdrlen(hdr->frame_control))
+			goto free;
+
 		tid = *ieee80211_get_qos_ctl(hdr) &
 			 IEEE80211_QOS_CTL_TAG1D_MASK;
 		qid = tid_to_ac[tid];
