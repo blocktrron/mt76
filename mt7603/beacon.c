@@ -52,6 +52,12 @@ mt7603_update_beacon_iter(void *priv, u8 *mac, struct ieee80211_vif *vif)
 
 	spin_lock_bh(&dev->ps_lock);
 
+	if (dev->fq_check) {
+		dev_warn(dev->mt76.dev, "Frame queue check failed\n");
+		dev_kfree_skb(skb);
+		goto out;
+	}
+
 	mt76_wr(dev, MT_DMA_FQCR0, val |
 		FIELD_PREP(MT_DMA_FQCR0_TARGET_QID, MT_TX_HW_QUEUE_BCN));
 	if (!mt76_poll(dev, MT_DMA_FQCR0, MT_DMA_FQCR0_BUSY, 0, 5000)) {

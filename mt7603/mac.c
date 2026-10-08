@@ -183,6 +183,11 @@ void mt7603_filter_tx(struct mt7603_dev *dev, int mac_idx, int idx, bool abort)
 	u32 flush_mask;
 	int i, port, queue;
 
+	if (dev->fq_check) {
+		dev_warn(dev->mt76.dev, "Frame queue check failed\n");
+		return;
+	}
+
 	if (1 || abort) {
 		port = 3; /* PSE */
 		queue = 8; /* free queue */
