@@ -215,10 +215,11 @@ void mt7603_filter_tx(struct mt7603_dev *dev, int mac_idx, int idx, bool abort)
 			FIELD_PREP(MT_DMA_FQCR0_DEST_PORT_ID, port) |
 			FIELD_PREP(MT_DMA_FQCR0_DEST_QUEUE_ID, queue));
 
-		mt76_poll(dev, MT_DMA_FQCR0, MT_DMA_FQCR0_BUSY, 0, 5000);
+		if (!mt76_poll(dev, MT_DMA_FQCR0, MT_DMA_FQCR0_BUSY, 0, 5000)) {
+			dev->fq_check = MT7603_WATCHDOG_TIMEOUT;
+			break;
+		}
 	}
-
-	WARN_ON_ONCE(mt76_rr(dev, MT_DMA_FQCR0) & MT_DMA_FQCR0_BUSY);
 
 	mt7603_wtbl_set_skip_tx(dev, idx, false);
 }
@@ -254,7 +255,10 @@ __mt7603_wtbl_set_ps(struct mt7603_dev *dev, struct mt7603_sta *sta,
 		FIELD_PREP(MT_PSE_RTA_REDIRECT_EN, enabled) |
 		MT_PSE_RTA_WRITE | MT_PSE_RTA_BUSY);
 
-	mt76_poll(dev, MT_PSE_RTA, MT_PSE_RTA_BUSY, 0, 5000);
+	if (!mt76_poll(dev, MT_PSE_RTA, MT_PSE_RTA_BUSY, 0, 5000)) {
+		dev->fq_check = MT7603_WATCHDOG_TIMEOUT;
+		goto out;
+	};
 
 	if (enabled && filter)
 		mt7603_filter_tx(dev, sta->vif->idx, idx, false);
@@ -264,6 +268,7 @@ __mt7603_wtbl_set_ps(struct mt7603_dev *dev, struct mt7603_sta *sta,
 	mt76_rmw(dev, addr + 3 * 4, MT_WTBL1_W3_POWER_SAVE,
 		 enabled * MT_WTBL1_W3_POWER_SAVE);
 	mt76_clear(dev, MT_WTBL1_OR, MT_WTBL1_OR_PSM_WRITE);
+out:
 	sta->ps = enabled;
 }
 
