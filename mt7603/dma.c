@@ -116,6 +116,11 @@ void mt7603_queue_rx_skb(struct mt76_dev *mdev, enum mt76_rxq_id q,
 	__le32 *end = (__le32 *)&skb->data[skb->len];
 	enum rx_pkt_type type;
 
+	if (!pskb_may_pull(skb, sizeof(__le32))) {
+		dev_kfree_skb(skb);
+		return;
+	}
+
 	type = le32_get_bits(rxd[0], MT_RXD0_PKT_TYPE);
 
 	if (q == MT_RXQ_MCU) {
