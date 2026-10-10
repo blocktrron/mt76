@@ -27,6 +27,9 @@ mt7603_mcu_parse_response(struct mt76_dev *mdev, int cmd,
 		return -ETIMEDOUT;
 	}
 
+	if (skb->len < sizeof(struct mt7603_mcu_rxd))
+		return -EAGAIN;
+
 	rxd = (struct mt7603_mcu_rxd *)skb->data;
 	if (seq != rxd->seq)
 		return -EAGAIN;
