@@ -719,6 +719,13 @@ mt7603_mac_fill_rx(struct mt7603_dev *dev, struct sk_buff *skb)
 	if (!skb_pull(skb, (u8 *)rxd - skb->data + 2 * remove_pad))
 		return -EINVAL;
 
+	if (!pskb_may_pull(skb, sizeof(__le16)))
+		return -EINVAL;
+
+	hdr = (struct ieee80211_hdr *)skb->data;
+	if (!pskb_may_pull(skb, ieee80211_hdrlen(hdr->frame_control)))
+		return -EINVAL;
+
 	if (insert_ccmp_hdr) {
 		u8 key_id = FIELD_GET(MT_RXD1_NORMAL_KEY_ID, rxd1);
 
