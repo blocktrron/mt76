@@ -540,14 +540,23 @@ mt7603_mac_fill_rx(struct mt7603_dev *dev, struct sk_buff *skb)
 	struct ieee80211_supported_band *sband;
 	struct ieee80211_hdr *hdr;
 	__le32 *rxd = (__le32 *)skb->data;
-	u32 rxd0 = le32_to_cpu(rxd[0]);
-	u32 rxd1 = le32_to_cpu(rxd[1]);
-	u32 rxd2 = le32_to_cpu(rxd[2]);
-	bool unicast = rxd1 & MT_RXD1_NORMAL_U2M;
+	u32 rxd0;
+	u32 rxd1;
+	u32 rxd2;
+	bool unicast;
 	bool insert_ccmp_hdr = false;
 	bool remove_pad;
 	int idx;
 	int i;
+
+	if (!pskb_may_pull(skb, 4 * sizeof(*rxd)))
+		return -EINVAL;
+
+	rxd = (__le32 *)skb->data;
+	rxd0 = le32_to_cpu(rxd[0]);
+	rxd1 = le32_to_cpu(rxd[1]);
+	rxd2 = le32_to_cpu(rxd[2]);
+	unicast = rxd1 & MT_RXD1_NORMAL_U2M;
 
 	memset(status, 0, sizeof(*status));
 
@@ -596,6 +605,9 @@ mt7603_mac_fill_rx(struct mt7603_dev *dev, struct sk_buff *skb)
 	if (rxd0 & MT_RXD0_NORMAL_GROUP_1) {
 		u8 *data = (u8 *)rxd;
 
+		if ((u8 *)rxd + 6 * sizeof(*rxd) > skb_tail_pointer(skb))
+			return -EINVAL;
+
 		if (status->flag & RX_FLAG_DECRYPTED) {
 			switch (FIELD_GET(MT_RXD2_NORMAL_SEC_MODE, rxd2)) {
 			case MT_CIPHER_AES_CCMP:
@@ -625,6 +637,9 @@ mt7603_mac_fill_rx(struct mt7603_dev *dev, struct sk_buff *skb)
 			return -EINVAL;
 	}
 	if (rxd0 & MT_RXD0_NORMAL_GROUP_2) {
+		if ((u8 *)rxd + 2 * sizeof(*rxd) > skb_tail_pointer(skb))
+			return -EINVAL;
+
 		status->timestamp = le32_to_cpu(rxd[0]);
 		status->flag |= RX_FLAG_MACTIME_START;
 
@@ -647,9 +662,15 @@ mt7603_mac_fill_rx(struct mt7603_dev *dev, struct sk_buff *skb)
 			return -EINVAL;
 	}
 	if (rxd0 & MT_RXD0_NORMAL_GROUP_3) {
-		u32 rxdg0 = le32_to_cpu(rxd[0]);
-		u32 rxdg3 = le32_to_cpu(rxd[3]);
+		u32 rxdg0;
+		u32 rxdg3;
 		bool cck = false;
+
+		if ((u8 *)rxd + 4 * sizeof(*rxd) > skb_tail_pointer(skb))
+			return -EINVAL;
+
+		rxdg0 = le32_to_cpu(rxd[0]);
+		rxdg3 = le32_to_cpu(rxd[3]);
 
 		i = FIELD_GET(MT_RXV1_TX_RATE, rxdg0);
 		switch (FIELD_GET(MT_RXV1_TX_MODE, rxdg0)) {
