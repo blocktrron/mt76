@@ -272,6 +272,17 @@ int mt7603_dma_init(struct mt7603_dev *dev)
 
 void mt7603_dma_cleanup(struct mt7603_dev *dev)
 {
+	/*
+	 * A failed reset leaves the workers and NAPIs disabled, which
+	 * mt76_dma_cleanup() would disable a second time and wait on forever.
+	 */
+	if (test_and_clear_bit(MT76_RESET, &dev->mphy.state)) {
+		mt76_worker_enable(&dev->mt76.tx_worker);
+		napi_enable(&dev->mt76.tx_napi);
+		napi_enable(&dev->mt76.napi[0]);
+		napi_enable(&dev->mt76.napi[1]);
+	}
+
 	mt76_clear(dev, MT_WPDMA_GLO_CFG,
 		   MT_WPDMA_GLO_CFG_TX_DMA_EN |
 		   MT_WPDMA_GLO_CFG_RX_DMA_EN |

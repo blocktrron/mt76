@@ -1352,8 +1352,10 @@ wait_for_wpdma(struct mt7603_dev *dev)
 			 0, 1000);
 }
 
-static void mt7603_pse_reset(struct mt7603_dev *dev)
+static bool mt7603_pse_reset(struct mt7603_dev *dev)
 {
+	bool failed;
+
 	/* Clear previous reset result */
 	if (!dev->reset_cause[RESET_CAUSE_RESET_FAILED])
 		mt76_clear(dev, MT_MCU_DEBUG_RESET, MT_MCU_DEBUG_RESET_PSE_S);
@@ -1362,9 +1364,10 @@ static void mt7603_pse_reset(struct mt7603_dev *dev)
 	dev->bcast_check = 0;
 	mt76_set(dev, MT_MCU_DEBUG_RESET, MT_MCU_DEBUG_RESET_PSE);
 
-	if (!mt76_poll_msec(dev, MT_MCU_DEBUG_RESET,
-			    MT_MCU_DEBUG_RESET_PSE_S,
-			    MT_MCU_DEBUG_RESET_PSE_S, 500)) {
+	failed = !mt76_poll_msec(dev, MT_MCU_DEBUG_RESET,
+				 MT_MCU_DEBUG_RESET_PSE_S,
+				 MT_MCU_DEBUG_RESET_PSE_S, 500);
+	if (failed) {
 		dev->reset_cause[RESET_CAUSE_RESET_FAILED]++;
 		mt76_clear(dev, MT_MCU_DEBUG_RESET, MT_MCU_DEBUG_RESET_PSE);
 	} else {
@@ -1374,6 +1377,8 @@ static void mt7603_pse_reset(struct mt7603_dev *dev)
 
 	if (dev->reset_cause[RESET_CAUSE_RESET_FAILED] >= 3)
 		dev->reset_cause[RESET_CAUSE_RESET_FAILED] = 0;
+
+	return failed;
 }
 
 void mt7603_mac_dma_start(struct mt7603_dev *dev)
@@ -1453,20 +1458,34 @@ static void mt7603_dma_sched_reset(struct mt7603_dev *dev)
 static void mt7603_mac_watchdog_reset(struct mt7603_dev *dev)
 {
 	int beacon_int = dev->mt76.beacon_int;
-	u32 mask = dev->mt76.mmio.irqmask;
+	bool reset_failed = false;
+	u32 mask;
 	int i;
 
-	ieee80211_stop_queues(dev->mt76.hw);
-	set_bit(MT76_RESET, &dev->mphy.state);
+	/*
+	 * After a failed reset the device is left stopped. A retry must not
+	 * disable the workers and NAPIs a second time, as napi_disable() on
+	 * an already disabled NAPI never returns, and it has to restore the
+	 * interrupt mask saved by the first attempt, since the current one is
+	 * already cleared.
+	 */
+	if (!test_bit(MT76_RESET, &dev->mphy.state)) {
+		dev->reset_irqmask = dev->mt76.mmio.irqmask;
 
-	/* lock/unlock all queues to ensure that no tx is pending */
-	mt76_txq_schedule_all(&dev->mphy);
+		ieee80211_stop_queues(dev->mt76.hw);
+		set_bit(MT76_RESET, &dev->mphy.state);
 
-	mt76_worker_disable(&dev->mt76.tx_worker);
-	tasklet_disable(&dev->mt76.pre_tbtt_tasklet);
-	napi_disable(&dev->mt76.napi[0]);
-	napi_disable(&dev->mt76.napi[1]);
-	napi_disable(&dev->mt76.tx_napi);
+		/* lock/unlock all queues to ensure that no tx is pending */
+		mt76_txq_schedule_all(&dev->mphy);
+
+		mt76_worker_disable(&dev->mt76.tx_worker);
+		tasklet_disable(&dev->mt76.pre_tbtt_tasklet);
+		napi_disable(&dev->mt76.napi[0]);
+		napi_disable(&dev->mt76.napi[1]);
+		napi_disable(&dev->mt76.tx_napi);
+	}
+
+	mask = dev->reset_irqmask;
 
 	mutex_lock(&dev->mt76.mutex);
 
@@ -1498,9 +1517,9 @@ static void mt7603_mac_watchdog_reset(struct mt7603_dev *dev)
 	if (dev->reset_cause[RESET_CAUSE_RESET_FAILED] ||
 	    dev->cur_reset_cause == RESET_CAUSE_BCAST_TXS_DEAD ||
 	    dev->cur_reset_cause == RESET_CAUSE_RX_PSE_BUSY)
-		mt7603_pse_reset(dev);
+		reset_failed = mt7603_pse_reset(dev);
 
-	if (!dev->reset_cause[RESET_CAUSE_RESET_FAILED]) {
+	if (!reset_failed) {
 		mt7603_mac_dma_start(dev);
 
 		mt7603_irq_enable(dev, mask);
@@ -1509,6 +1528,11 @@ static void mt7603_mac_watchdog_reset(struct mt7603_dev *dev)
 	}
 
 	mutex_unlock(&dev->mt76.mutex);
+
+	if (reset_failed) {
+		dev_warn(dev->mt76.dev, "reset failed, keeping device stopped\n");
+		return;
+	}
 
 	mt76_worker_enable(&dev->mt76.tx_worker);
 
