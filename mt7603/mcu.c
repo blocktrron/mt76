@@ -428,8 +428,14 @@ int mt7603_mcu_set_channel(struct mt7603_dev *dev)
 	for (i = 0; i < ARRAY_SIZE(req.txpower); i++)
 		req.txpower[i] = tx_power;
 
-	ret = mt76_mcu_send_msg(&dev->mt76, MCU_EXT_CMD_CHANNEL_SWITCH, &req,
-				sizeof(req), true);
+	if (dev->mcu_chan_timeout) {
+		/* debugfs: simulate a one-shot MCU timeout */
+		dev->mcu_chan_timeout = false;
+		ret = -ETIMEDOUT;
+	} else {
+		ret = mt76_mcu_send_msg(&dev->mt76, MCU_EXT_CMD_CHANNEL_SWITCH,
+					&req, sizeof(req), true);
+	}
 	if (ret)
 		return ret;
 

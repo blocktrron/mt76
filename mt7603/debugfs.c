@@ -6,24 +6,13 @@ static int
 mt7603_reset_read(struct seq_file *s, void *data)
 {
 	struct mt7603_dev *dev = dev_get_drvdata(s->private);
-	static const char * const reset_cause_str[] = {
-		[RESET_CAUSE_TX_HANG] = "TX hang",
-		[RESET_CAUSE_TX_BUSY] = "TX DMA busy stuck",
-		[RESET_CAUSE_RX_BUSY] = "RX DMA busy stuck",
-		[RESET_CAUSE_RX_PSE_BUSY] = "RX PSE busy stuck",
-		[RESET_CAUSE_BEACON_STUCK] = "Beacon stuck",
-		[RESET_CAUSE_BCAST_TXS_DEAD] = "Broadcast TXS dead",
-		[RESET_CAUSE_FQ_STUCK] = "FQ stuck",
-		[RESET_CAUSE_MCU_HANG] = "MCU hang",
-		[RESET_CAUSE_RESET_FAILED] = "PSE reset failed",
-	};
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(reset_cause_str); i++) {
-		if (!reset_cause_str[i])
+	for (i = 0; i < __RESET_CAUSE_MAX; i++) {
+		if (!mt7603_reset_cause_str[i])
 			continue;
 
-		seq_printf(s, "%20s: %u\n", reset_cause_str[i],
+		seq_printf(s, "%20s: %u\n", mt7603_reset_cause_str[i],
 			   dev->reset_cause[i]);
 	}
 
@@ -109,6 +98,10 @@ void mt7603_init_debugfs(struct mt7603_dev *dev)
 				    mt76_queues_read);
 	debugfs_create_file("edcca", 0600, dir, dev, &fops_edcca);
 	debugfs_create_u32("reset_test", 0600, dir, &dev->reset_test);
+	debugfs_create_bool("reset_force_fail", 0600, dir,
+			    &dev->reset_force_fail);
+	debugfs_create_bool("mcu_chan_timeout", 0600, dir,
+			    &dev->mcu_chan_timeout);
 	debugfs_create_devm_seqfile(dev->mt76.dev, "reset", dir,
 				    mt7603_reset_read);
 	debugfs_create_devm_seqfile(dev->mt76.dev, "radio", dir,

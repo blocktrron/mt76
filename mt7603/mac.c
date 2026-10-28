@@ -1392,9 +1392,15 @@ static bool mt7603_pse_reset(struct mt7603_dev *dev)
 	dev->bcast_check = 0;
 	mt76_set(dev, MT_MCU_DEBUG_RESET, MT_MCU_DEBUG_RESET_PSE);
 
-	failed = !mt76_poll_msec(dev, MT_MCU_DEBUG_RESET,
-				 MT_MCU_DEBUG_RESET_PSE_S,
-				 MT_MCU_DEBUG_RESET_PSE_S, 500);
+	if (dev->reset_force_fail) {
+		/* debugfs: simulate a failed PSE reset once */
+		dev->reset_force_fail = false;
+		failed = true;
+	} else {
+		failed = !mt76_poll_msec(dev, MT_MCU_DEBUG_RESET,
+					 MT_MCU_DEBUG_RESET_PSE_S,
+					 MT_MCU_DEBUG_RESET_PSE_S, 500);
+	}
 	if (failed) {
 		dev->reset_cause[RESET_CAUSE_RESET_FAILED]++;
 		mt76_clear(dev, MT_MCU_DEBUG_RESET, MT_MCU_DEBUG_RESET_PSE);
@@ -1483,12 +1489,27 @@ static void mt7603_dma_sched_reset(struct mt7603_dev *dev)
 	mt76_clear(dev, MT_SCH_4, MT_SCH_4_RESET);
 }
 
+const char * const mt7603_reset_cause_str[__RESET_CAUSE_MAX] = {
+	[RESET_CAUSE_TX_HANG] = "TX hang",
+	[RESET_CAUSE_TX_BUSY] = "TX DMA busy stuck",
+	[RESET_CAUSE_RX_BUSY] = "RX DMA busy stuck",
+	[RESET_CAUSE_RX_PSE_BUSY] = "RX PSE busy stuck",
+	[RESET_CAUSE_BEACON_STUCK] = "Beacon stuck",
+	[RESET_CAUSE_BCAST_TXS_DEAD] = "Broadcast TXS dead",
+	[RESET_CAUSE_FQ_STUCK] = "FQ stuck",
+	[RESET_CAUSE_MCU_HANG] = "MCU hang",
+	[RESET_CAUSE_RESET_FAILED] = "PSE reset failed",
+};
+
 static void mt7603_mac_watchdog_reset(struct mt7603_dev *dev)
 {
 	int beacon_int = dev->mt76.beacon_int;
 	bool reset_failed = false;
 	u32 mask;
 	int i;
+
+	dev_info(dev->mt76.dev, "reset recovery started (cause: %s)\n",
+		 mt7603_reset_cause_str[dev->cur_reset_cause] ?: "unknown");
 
 	/*
 	 * After a failed reset the device is left stopped. A retry must not
@@ -1542,7 +1563,8 @@ static void mt7603_mac_watchdog_reset(struct mt7603_dev *dev)
 		mt76_queue_rx_reset(dev, i);
 	}
 
-	if (dev->reset_cause[RESET_CAUSE_RESET_FAILED] ||
+	if (dev->reset_force_fail ||
+	    dev->reset_cause[RESET_CAUSE_RESET_FAILED] ||
 	    dev->cur_reset_cause == RESET_CAUSE_BCAST_TXS_DEAD ||
 	    dev->cur_reset_cause == RESET_CAUSE_RX_PSE_BUSY)
 		reset_failed = mt7603_pse_reset(dev);
@@ -1558,9 +1580,14 @@ static void mt7603_mac_watchdog_reset(struct mt7603_dev *dev)
 	mutex_unlock(&dev->mt76.mutex);
 
 	if (reset_failed) {
-		dev_warn(dev->mt76.dev, "reset failed, keeping device stopped\n");
+		dev_warn(dev->mt76.dev,
+			 "reset recovery failed (cause: %s), keeping device stopped\n",
+			 mt7603_reset_cause_str[dev->cur_reset_cause] ?: "unknown");
 		return;
 	}
+
+	dev_info(dev->mt76.dev, "reset recovery succeeded (cause: %s)\n",
+		 mt7603_reset_cause_str[dev->cur_reset_cause] ?: "unknown");
 
 	mt76_worker_enable(&dev->mt76.tx_worker);
 

@@ -162,10 +162,13 @@ struct mt7603_dev {
 	u16 rx_dma_idx;
 
 	u32 reset_test;
+	bool reset_force_fail;
+	bool mcu_chan_timeout;
 
 	unsigned int reset_cause[__RESET_CAUSE_MAX];
 };
 
+extern const char * const mt7603_reset_cause_str[__RESET_CAUSE_MAX];
 extern const struct mt76_driver_ops mt7603_drv_ops;
 extern const struct ieee80211_ops mt7603_ops;
 extern struct pci_driver mt7603_pci_driver;
