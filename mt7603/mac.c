@@ -1359,11 +1359,16 @@ static void mt7603_pse_reset(struct mt7603_dev *dev)
 
 	if (!mt76_poll_msec(dev, MT_MCU_DEBUG_RESET,
 			    MT_MCU_DEBUG_RESET_PSE_S,
-			    MT_MCU_DEBUG_RESET_PSE_S, 500)) {
+			    MT_MCU_DEBUG_RESET_PSE_S, 1000)) {
 		dev->failed_pse_reset_attempts++;
 		dev->reset_cause[RESET_CAUSE_RESET_FAILED]++;
 		mt76_clear(dev, MT_MCU_DEBUG_RESET, MT_MCU_DEBUG_RESET_PSE);
+		dev_warn(dev->mt76.dev, "PSE reset failed - Count %d\n",
+			 dev->failed_pse_reset_attempts);
 	} else {
+		if (dev->failed_pse_reset_attempts)
+			dev_warn(dev->mt76.dev, "PSE reset succeeded after %d attempts\n",
+				 dev->failed_pse_reset_attempts);
 		dev->failed_pse_reset_attempts = 0;
 		mt76_clear(dev, MT_MCU_DEBUG_RESET, MT_MCU_DEBUG_RESET_QUEUES);
 	}
@@ -1374,8 +1379,10 @@ static void mt7603_pse_reset(struct mt7603_dev *dev)
 	 * reached, the counter is reset and the device will
 	 * return to normal operation.
 	 */
-	if (dev->failed_pse_reset_attempts >= 3)
+	if (dev->failed_pse_reset_attempts >= 3) {
+		dev_warn(dev->mt76.dev, "PSE reset failed 3 times, resetting counter\n");
 		dev->failed_pse_reset_attempts = 0;
+	}
 }
 
 void mt7603_mac_dma_start(struct mt7603_dev *dev)
