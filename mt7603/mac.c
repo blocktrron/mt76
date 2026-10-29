@@ -549,7 +549,7 @@ mt7603_mac_fill_rx(struct mt7603_dev *dev, struct sk_buff *skb)
 	int idx;
 	int i;
 
-	if (!pskb_may_pull(skb, 4 * sizeof(*rxd)))
+	if (skb->len < 4 * sizeof(*rxd))
 		return -EINVAL;
 
 	rxd = (__le32 *)skb->data;
